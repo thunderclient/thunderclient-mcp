@@ -1,7 +1,9 @@
+// tools.ts
 import { z, ZodSchema } from "zod";
 import { ThunderClient } from "../thunder-client.js";
 import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToMCPInputSchema } from "../utils/schema-converter.js";
+import { toolPrompts } from "./tool-prompts.js";
 
 // ----------------------------
 // ToolDefinition Interface
@@ -26,50 +28,52 @@ function defineTool<TSchema extends ZodSchema, TResult>(
 // Tool Definitions
 // ----------------------------
 export const toolDefinitions = {
-
   thunder_help: defineTool({
-  name: "tc_help",
-  description: "Show Thunder Client CLI help using `tc --help` in the given project directory.",
-  schema: z.object({
-    projectDir: z.string().min(1, "projectDir is required"),
+    name: "tc_help",
+    description: "Show Thunder Client CLI help using `tc --help` in the given project directory.",
+    schema: z.object({
+      projectDir: z.string().min(1, "projectDir is required"),
+    }),
+    handler: async (client, args) => {
+      return client.thunder_help(args.projectDir.trim());
+    },
   }),
-  handler: async (client, args) => {
-    const projectDir = args.projectDir.trim() || "/";
-    return client.thunder_help(projectDir);
-  },
-}),
-thunder_debug: defineTool({
-  name: "tc_debug",
-  description: "Show Thunder Client CLI debug using `tc --debug` in the given project directory.",
-  schema: z.object({
-    projectDir: z.string().min(1, "projectDir is required"),
-  }),
-  handler: async (client, args) => {
-    const projectDir = args.projectDir.trim() || "/";
-    return client.thunder_debug(projectDir);
-  },
-}),
 
-thunder_curl: defineTool({
-  name: "tc_curl",
-  description: "Run a full curl command via Thunder Client CLI. Supports saving the request to a collection or folder.",
-  schema: z.object({
-    curlInput: z
-      .string()
-      .min(5)
-      .refine((val) => val.trim().toLowerCase().startsWith("curl "), {
-        message: "Input must start with 'curl '",
-      }),
-    name: z.string().optional(),
-    collection: z.string().optional(),
-    folder: z.string().optional(),
-    projectDir: z.string().min(1, "projectDir is required"),
+  thunder_debug: defineTool({
+    name: "tc_debug",
+    description: "Show Thunder Client CLI debug using `tc --debug` in the given project directory.",
+    schema: z.object({
+      projectDir: z.string().min(1, "projectDir is required"),
+    }),
+    handler: async (client, args) => {
+      return client.thunder_debug(args.projectDir.trim());
+    },
   }),
-  handler: async (client, args) => {
-    const projectDir = args.projectDir.trim() || "/";
-    return client.runCurl({ ...args, projectDir });
-  },
-}),
+
+  thunder_curl: defineTool({
+    name: "tc_curl",
+  description: `Run a full curl command via Thunder Client CLI. Supports saving the request to a collection or folder.
+  Instructions:
+- \`curlInput\` must be a valid curl command string that starts with \`curl \`.
+- \`projectDir\` must be the **full absolute path** to the current project directory — do not use \`.\` or \`/\`.
+- If \`folder\` is specified, you **must also provide** the \`collection\` field.
+- if needed the collection in the thunder client u can read from the folder thunder-tests in the curret project`,
+    schema: z.object({
+      curlInput: z
+        .string()
+        .min(5)
+        .refine((val) => val.trim().toLowerCase().startsWith("curl "), {
+          message: "Input must start with 'curl '",
+        }),
+      name: z.string().optional(),
+      collection: z.string().optional(),
+      folder: z.string().optional(),
+      projectDir: z.string().min(1, "projectDir is required"),
+    }),
+    handler: async (client, args) => {
+      return client.runCurl({ ...args, projectDir: args.projectDir.trim() });
+    },
+  }),
 } as const;
 
 // ----------------------------
@@ -77,8 +81,9 @@ thunder_curl: defineTool({
 // ----------------------------
 export const tools: Tool[] = Object.values(toolDefinitions).map((def) => ({
   name: def.name,
-  description: def.description,
+  description: def.description.trim(),
   inputSchema: zodToMCPInputSchema(def.schema),
+//   prompt: toolPrompts[def.name] ?? undefined,
 }));
 
 // ----------------------------
