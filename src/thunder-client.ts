@@ -5,10 +5,6 @@ import * as fs from "fs";
 const execAsync = promisify(exec);
 
 export class ThunderClient {
-  /**
-   * Show Thunder Client CLI help with debug output.
-   * Requires a valid project directory to run in.
-   */
   async thunder_help(projectDir: string): Promise<{
     success: boolean;
     result?: string;
@@ -34,8 +30,8 @@ export class ThunderClient {
       };
     }
   }
-
-    async thunder_debug(projectDir: string): Promise<{
+  
+  async thunder_debug(projectDir: string): Promise<{
     success: boolean;
     result?: string;
     error?: string;
@@ -60,10 +56,7 @@ export class ThunderClient {
       };
     }
   }
-  
-  /**
-   * Run a curl-style Thunder Client request with required projectDir.
-   */
+
   async runCurl({
     curlInput,
     name,
@@ -99,7 +92,24 @@ export class ThunderClient {
       };
     }
 
-    const curlArgs = trimmed.slice(5).trim();
+    let curlArgs = trimmed.slice(5).trim();
+
+    // ✅ Fix for Windows escaping in -d or --data
+    if (process.platform === "win32") {
+      curlArgs = curlArgs.replace(
+        /(-d|--data)\s+(['"])([\s\S]*?)\2/,
+        (_, flag: string, _quote: string, body: string) => {
+          try {
+            const jsonBody = JSON.stringify(JSON.parse(body)); // Validates & escapes
+            return `${flag} "${jsonBody}"`;
+          } catch {
+            // Fallback: escape double quotes
+            const escapedBody = body.replace(/"/g, '\\"');
+            return `${flag} "${escapedBody}"`;
+          }
+        }
+      );
+    }
 
     let cmd = `tc curl ${curlArgs} --ws .`;
     if (name) cmd += ` --name "${name}"`;
