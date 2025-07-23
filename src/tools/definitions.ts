@@ -50,30 +50,47 @@ export const toolDefinitions = {
     },
   }),
 
+
   thunder_curl: defineTool({
     name: "tc_curl",
-  description: `Run a full curl command via Thunder Client CLI. Supports saving the request to a collection or folder.
-  Instructions:
-- \`curlInput\` must be a valid curl command string that starts with \`curl \`.
-- \`projectDir\` must be the **full absolute path** to the current project directory — do not use \`.\` or \`/\`.
-- If \`folder\` is specified, you **must also provide** the \`collection\` field.
-- if needed the collection in the thunder client u can read from the folder thunder-tests in the curret project`,
+    description: `Run a full curl command via Thunder Client CLI. Supports saving the request to a collection or folder.
+Instructions:
+  - "curlInput" must be a valid curl command string that starts with "curl ".
+  - Example: 
+      "curlInput": "curl -X POST https://jsonplaceholder.typicode.com/posts -H \\"Content-Type: application/json\\" -d \\"{\\\\\\"title\\\\\\":\\\\\\"foo\\\\\\",\\\\\\"body\\\\\\":\\\\\\"bar\\\\\\",\\\\\\"userId\\\\\\":1}\\""
+  - "projectDir" must be the **full absolute path** to the current project directory — do not use "." or "/".
+  - If "folder" is specified, you **must also provide** the "collection" field.
+  - If needed, collections in Thunder Client can be found under the "thunder-tests" folder in your project.`,
+
     schema: z.object({
       curlInput: z
         .string()
         .min(5)
         .refine((val) => val.trim().toLowerCase().startsWith("curl "), {
-          message: "Input must start with 'curl '",
+          message: "curlInput must start with 'curl '",
         }),
       name: z.string().optional(),
       collection: z.string().optional(),
       folder: z.string().optional(),
-      projectDir: z.string().min(1, "projectDir is required"),
+      projectDir: z
+        .string()
+        .min(1, { message: "projectDir is required" }),
+    }).refine((data) => {
+      // If folder is provided, collection must also be provided
+      if (data.folder && !data.collection) {
+        return false;
+      }
+      return true;
+    }, {
+      message: "If 'folder' is provided, you must also provide 'collection'.",
+      path: ["collection"],
     }),
+
     handler: async (client, args) => {
       return client.runCurl({ ...args, projectDir: args.projectDir.trim() });
     },
-  }),
+  })
+
 } as const;
 
 // ----------------------------
@@ -83,7 +100,7 @@ export const tools: Tool[] = Object.values(toolDefinitions).map((def) => ({
   name: def.name,
   description: def.description.trim(),
   inputSchema: zodToMCPInputSchema(def.schema),
-//   prompt: toolPrompts[def.name] ?? undefined,
+  //   prompt: toolPrompts[def.name] ?? undefined,
 }));
 
 // ----------------------------
