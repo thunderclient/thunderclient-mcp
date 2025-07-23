@@ -35,10 +35,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (!toolDefinition) {
       throw new Error(`Unknown tool: ${name}`);
     }
-
+    
     const validatedArgs = toolDefinition.schema.parse(args);
     const result = await toolDefinition.handler(thunderClient, validatedArgs as any);
-
+    
     return {
       content: [
         {
