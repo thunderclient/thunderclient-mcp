@@ -2,6 +2,7 @@ import { z, ZodSchema } from "zod";
 import { ThunderClient } from "../thunder-client.js";
 import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToMCPInputSchema } from "../utils/schema-converter.js";
+import { resolve } from "upath";
 
 interface ToolDefinition<TSchema extends ZodSchema, TResult> {
   name: string;
@@ -16,6 +17,14 @@ function defineTool<TSchema extends ZodSchema, TResult>(
   return definition;
 }
 
+// Helper function to resolve project directory
+function resolveProjectDir(projectDir: string): string {
+  if (projectDir === "." || projectDir === "./") {
+    return process.cwd();
+  }
+  return resolve(projectDir);
+}
+
 export const toolDefinitions = {
   thunder_help: defineTool({
     name: "tc_help",
@@ -23,7 +32,7 @@ export const toolDefinitions = {
     schema: z.object({
       projectDir: z.string().min(1, "projectDir is required"),
     }),
-    handler: async (client, args) => client.thunder_help(args.projectDir.trim()),
+    handler: async (client, args) => client.thunder_help(resolveProjectDir(args.projectDir.trim())),
   }),
 
   thunder_debug: defineTool({
@@ -32,7 +41,7 @@ export const toolDefinitions = {
     schema: z.object({
       projectDir: z.string().min(1, "projectDir is required"),
     }),
-    handler: async (client, args) => client.thunder_debug(args.projectDir.trim()),
+    handler: async (client, args) => client.thunder_debug(resolveProjectDir(args.projectDir.trim())),
   }),
 
   thunder_curl: defineTool({
@@ -55,7 +64,7 @@ export const toolDefinitions = {
         message: "If 'folder' is provided, you must also provide 'collection'.",
         path: ["collection"],
       }),
-    handler: async (client, args) => client.runCurl({ ...args, projectDir: args.projectDir.trim() }),
+    handler: async (client, args) => client.runCurl({ ...args, projectDir: resolveProjectDir(args.projectDir.trim()) }),
   }),
 } as const;
 
