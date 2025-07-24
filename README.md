@@ -6,33 +6,40 @@ A Model Context Protocol (MCP) server that integrates Thunder Client functionali
 
 This MCP server provides three powerful tools for managing Thunder Client operations:
 
-### 1. `tc_create`  
-**Description:**  
-Saves API endpoints to Thunder Client, automatically creating collections and folders if they do not already exist.  
+### 1. `tc_create`
 
-**Usage:**  
-- Use AI to analyze your current project and automatically generate API requests in Thunder Client, with the appropriate collection and folder created as needed.  
-- Add new requests to a specific collection in Thunder Client.  
+**Description:**  
+Saves API endpoints to Thunder Client, automatically creating collections and folders if they do not already exist.
+
+**Usage:**
+
+- Use AI to analyze your current project and automatically generate API requests in Thunder Client, with the appropriate collection and folder created as needed.
+- Add new requests to a specific collection in Thunder Client.
 - Dynamically create a request using an AI-generated prompt.
-    
+
 ### 2. `tc_help`
+
 **Description:** Show Thunder Client CLI help using `tc --help` in the given project directory.
+
 - **Usage:** Get comprehensive help documentation for Thunder Client CLI
 
 ### 3. `tc_debug`
+
 **Description:** Show Thunder Client CLI debug information using `tc --debug` in the given project directory.
+
 - **Usage:** Troubleshoot and get detailed debug information from Thunder Client
 
 ## Installation & Setup
 
 ### Prerequisites
+
 ```bash
 npm i
 npm run build
 ```
+
 After building, a `dist` folder will be created. Copy the `index.js` path from the `dist` folder - this path will be used in your MCP server configuration.
 
- 
 ## Configuration for Different Environments
 
 ### For Cline
@@ -46,17 +53,16 @@ After building, a `dist` folder will be created. Copy the `index.js` path from t
 {
   "mcpServers": {
     "thunderclient": {
+      "name": "Thunder Client MCP Server",
       "type": "stdio",
-      "command": "node",
-      "args": [
-        "/path/to/thunder-mcp/dist/index.js"
-      ]
+      "command": "npx",
+      "args": ["-y", "thunderclient-mcp"]
     }
   }
 }
 ```
 
-**Important:** Replace `/path/to/thunder-mcp/dist/index.js` with the actual path to your `index.js` file from the `dist` folder.
+**Important:** Replace `thunderclient-mcp` with `/path/to/thunder-mcp/dist/index.js` with your actual `index.js` location in local Dev mode.
 
 Once configured, you can use all `tc_*` command tools in Cline's MCP interface.
 
@@ -76,10 +82,10 @@ mcpServers:
   - name: Thunder Client MCP Server
     command: node
     args:
-      - /path/to/thunder-mcp/dist/index.js
+      - thunderclient-mcp
 ```
 
-**Important:** Replace `/path/to/thunder-mcp/dist/index.js` with your actual `index.js` location.
+**Important:** Replace `thunderclient-mcp` with `/path/to/thunder-mcp/dist/index.js` with your actual `index.js` location in local Dev mode.
 
 ---
 
@@ -89,12 +95,14 @@ mcpServers:
 2. Click on the **Tools** icon in the interface
 3. Scroll down and click **+ Add more tools**
 4. Select **+ Add MCP Server**
-![alt text](/public/copolit_add_mcp_server.png)
+   ![alt text](/public/copolit_add_mcp_server.png)
 5. Choose **Stdio** as the connection type
-6. Enter the correct path to `node` and your `thunder-mcp/dist/index.js` file
-7. Save the configuration
+6. Enter the command to run as `npx thunderclient-mcp`
+7. Enter the mcp name `thunderclient-mcp-server-....`
+8. Choose where to install MCP, select `Global` or `User`
+9. Save the configuration
 
----
+**Important:** Replace `npx thunderclient-mcp` with `node /path/to/thunder-mcp/dist/index.js` with your actual `index.js` location in local Dev mode.
 
 # Example Prompts
 
@@ -117,7 +125,7 @@ This document contains simple example prompts for the `tc_create` tool to extrac
 ```
 "Get the endpoints from src/routes/ folder and save to Thunder Client with collection name 'Node API'."
 ```
- 
+
 ### 3. Create Simple HTTP Requests
 
 ```
