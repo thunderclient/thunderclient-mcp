@@ -4,57 +4,54 @@ import * as fs from "fs";
 
 const execAsync = promisify(exec);
 
+// Support multiple data flags in curl
+function normalizeCurlInputForWindows(curlInput: string): string {
+  return curlInput.replace(
+    /(-d|--data(?:-raw)?)\s+(['"])([\s\S]*?)\2/g,
+    (_, flag: string, _quote: string, rawBody: string) => {
+      const escapedBody = rawBody.replace(/"/g, '\\"');
+      return `${flag} "${escapedBody}"`;
+    }
+  );
+}
+
 export class ThunderClient {
-  async thunder_help(projectDir: string): Promise<{
-    success: boolean;
-    result?: string;
-    error?: string;
-    projectDir: string;
-  }> {
+  private validateProjectDir(projectDir: string): { valid: boolean; error?: string } {
     if (!fs.existsSync(projectDir)) {
       return {
-        success: false,
+        valid: false,
         error: `Invalid project directory: ${projectDir}`,
-        projectDir,
       };
     }
+    return { valid: true };
+  }
 
+  private async execCommand(command: string, cwd: string): Promise<{ success: boolean; result?: string; error?: string }> {
     try {
-      const { stdout } = await execAsync("tc --help", { cwd: projectDir });
-      return { success: true, result: stdout, projectDir };
+      const { stdout } = await execAsync(command, { cwd });
+      return { success: true, result: stdout };
     } catch (error: any) {
       return {
         success: false,
-        error: error.stderr || error.message || "Unknown error",
-        projectDir,
+        error: error?.stderr || error?.message || "Unknown error",
       };
     }
   }
-  
-  async thunder_debug(projectDir: string): Promise<{
-    success: boolean;
-    result?: string;
-    error?: string;
-    projectDir: string;
-  }> {
-    if (!fs.existsSync(projectDir)) {
-      return {
-        success: false,
-        error: `Invalid project directory: ${projectDir}`,
-        projectDir,
-      };
-    }
 
-    try {
-      const { stdout } = await execAsync("tc --debug", { cwd: projectDir });
-      return { success: true, result: stdout, projectDir };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.stderr || error.message || "Unknown error",
-        projectDir,
-      };
-    }
+  async thunder_help(projectDir: string) {
+    const check = this.validateProjectDir(projectDir);
+    if (!check.valid) return { success: false, error: check.error, projectDir };
+
+    const result = await this.execCommand("tc --help", projectDir);
+    return { ...result, projectDir };
+  }
+
+  async thunder_debug(projectDir: string) {
+    const check = this.validateProjectDir(projectDir);
+    if (!check.valid) return { success: false, error: check.error, projectDir };
+
+    const result = await this.execCommand("tc --debug", projectDir);
+    return { ...result, projectDir };
   }
 
   async runCurl({
@@ -69,46 +66,18 @@ export class ThunderClient {
     collection?: string;
     folder?: string;
     projectDir: string;
-  }): Promise<{
-    success: boolean;
-    result?: string;
-    error?: string;
-    projectDir: string;
-  }> {
-    if (!fs.existsSync(projectDir)) {
-      return {
-        success: false,
-        error: `Invalid project directory: ${projectDir}`,
-        projectDir,
-      };
+  }): Promise<{ success: boolean; error?: string }> {
+    const check = this.validateProjectDir(projectDir);
+    if (!check.valid) return { success: false, error: check.error };
+
+    const trimmedInput = curlInput.trim();
+    if (!trimmedInput.toLowerCase().startsWith("curl ")) {
+      return { success: false, error: "Input must start with 'curl '" };
     }
 
-    const trimmed = curlInput.trim();
-    if (!trimmed.toLowerCase().startsWith("curl ")) {
-      return {
-        success: false,
-        error: "Input must start with 'curl '",
-        projectDir,
-      };
-    }
-
-    let curlArgs = trimmed.slice(5).trim();
-
-    // ✅ Fix for Windows escaping in -d or --data
+    let curlArgs = trimmedInput.slice(5).trim();
     if (process.platform === "win32") {
-      curlArgs = curlArgs.replace(
-        /(-d|--data)\s+(['"])([\s\S]*?)\2/,
-        (_, flag: string, _quote: string, body: string) => {
-          try {
-            const jsonBody = JSON.stringify(JSON.parse(body)); // Validates & escapes
-            return `${flag} "${jsonBody}"`;
-          } catch {
-            // Fallback: escape double quotes
-            const escapedBody = body.replace(/"/g, '\\"');
-            return `${flag} "${escapedBody}"`;
-          }
-        }
-      );
+      curlArgs = normalizeCurlInputForWindows(curlArgs);
     }
 
     let cmd = `tc curl ${curlArgs} --ws .`;
@@ -116,15 +85,12 @@ export class ThunderClient {
     if (collection) cmd += ` --col "${collection}"`;
     if (folder) cmd += ` --fol "${folder}"`;
 
-    try {
-      const { stdout } = await execAsync(cmd, { cwd: projectDir });
-      return { success: true, result: stdout, projectDir };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.stderr || error.message || "Unknown error",
-        projectDir,
-      };
+    const result = await this.execCommand(cmd, projectDir);
+    if (result.success) {
+      return { success: true }; // ✅ Return only success: true
+    } else {
+      return { success: false, error: result.error };
     }
   }
+
 }

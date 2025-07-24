@@ -23,9 +23,13 @@ const server = new Server(
   }
 );
 
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return { tools };
+  return { 
+    tools
+  };
 });
+
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
