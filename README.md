@@ -37,22 +37,7 @@ npm run build
 ```
 After building, a `dist` folder will be created. Copy the `index.js` path from the `dist` folder - this path will be used in your MCP server configuration.
 
----
-
-## Model Configuration (For All Environments)
-
-Regardless of which environment you're using (Cline, Continue.dev, or GitHub Copilot), you'll need to configure your AI model:
-
-1. Navigate to your **Models** section (usually located beside Agent or in settings)
-2. Click on **Manage Model** or **Model Settings**
-3. Set your **OpenAI API key** or configure your preferred AI provider
-4. Select an appropriate model such as **gpt-4**, **gpt-4-turbo**, or **claude-3.5-sonnet**
-5. Save your configuration
-
-**Note:** Model configuration steps may vary slightly between different environments, but the core requirements remain the same across all platforms.
-
----
-
+ 
 ## Configuration for Different Environments
 
 ### For Cline
