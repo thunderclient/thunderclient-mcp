@@ -37,7 +37,7 @@ export const toolDefinitions = {
 
   thunder_curl: defineTool({
     name: "tc_create",
-    description: "Save endpoints or APIs to Thunder Client using tc-curl and automatically create collections and folders if needed.",
+    description: "Saves API endpoints to Thunder Client, automatically creating collections and folders if they do not already exist.",
     schema: z
       .object({
         curlInput: z
