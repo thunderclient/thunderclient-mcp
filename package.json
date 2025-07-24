@@ -1,9 +1,9 @@
 {
   "name": "@thunderclient/mcp",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Thunder Client MCP Server",
-  "main": "./dist/index.js`",
-  "types": "./dist/index.d.ts",
+  "main": "dist/index.js`",
+  "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
     "build": "tsc",
@@ -11,7 +11,8 @@
     "postinstall": "npm install -g @thunderclient/cli@latest"
   },
   "bin": {
-    "thunderclient-mcp": "dist/index.js"
+    "@thunderclient/mcp": "dist/index.js",
+    "tcmcp": "dist/index.js"
   },
   "keywords": [],
   "author": "Thunder Client Limited",
