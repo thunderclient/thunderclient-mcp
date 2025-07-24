@@ -109,7 +109,7 @@ mcpServers:
 2. Click on the **Tools** icon in the interface
 3. Scroll down and click **+ Add more tools**
 4. Select **+ Add MCP Server**
-![alt text](copolit_add_mcp_server.png)
+![alt text](/public/copolit_add_mcp_server.png)
 5. Choose **Stdio** as the connection type
 6. Enter the correct path to `node` and your `thunder-mcp/dist/index.js` file
 7. Save the configuration
