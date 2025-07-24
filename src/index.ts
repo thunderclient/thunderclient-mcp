@@ -7,13 +7,16 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { toolHandlers, tools } from "./tools/definitions.js";
+import pkg from '../package.json' with { type: 'json' };
+
+const version = pkg.version;
 
 const thunderClient = new ThunderClient();
 
 const server = new Server(
   {
     name: "thunderclient-mcp",
-    version: "1.0.0",
+    version,
     title: "Thunder Client MCP",
   },
   {
