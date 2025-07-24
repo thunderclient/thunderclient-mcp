@@ -42,7 +42,7 @@ export class ThunderClient {
     const check = this.validateProjectDir(projectDir);
     if (!check.valid) return { success: false, error: check.error, projectDir };
 
-    const result = await this.execCommand("tc --help", projectDir);
+    const result = await this.execCommand("tc --help --mcp", projectDir);
     return { ...result, projectDir };
   }
 
@@ -50,7 +50,7 @@ export class ThunderClient {
     const check = this.validateProjectDir(projectDir);
     if (!check.valid) return { success: false, error: check.error, projectDir };
 
-    const result = await this.execCommand("tc --debug", projectDir);
+    const result = await this.execCommand("tc --debug --mcp", projectDir);
     return { ...result, projectDir };
   }
 
@@ -84,6 +84,7 @@ export class ThunderClient {
     if (name) cmd += ` --name "${name}"`;
     if (collection) cmd += ` --col "${collection}"`;
     if (folder) cmd += ` --fol "${folder}"`;
+    cmd+= ` --mcp`;
 
     const result = await this.execCommand(cmd, projectDir);
     if (result.success) {
