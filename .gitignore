@@ -1,6 +1,7 @@
 # Node modules
 node_modules/
 thunder-tests
+thunder-reports
 
 # Build output
 dist/
