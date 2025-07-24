@@ -6,27 +6,17 @@ A Model Context Protocol (MCP) server that integrates Thunder Client functionali
 
 This MCP server provides three powerful tools for managing Thunder Client operations:
 
-### 1. `tc_help`
-**Description:** Show Thunder Client CLI help using `tc --help` in the given project directory.
-- **Usage:** Get comprehensive help documentation for Thunder Client CLI
-- **Parameters:** 
-  - `projectDir` (required): Path to your Thunder Client project directory
-
-### 2. `tc_debug`
-**Description:** Show Thunder Client CLI debug information using `tc --debug` in the given project directory.
-- **Usage:** Troubleshoot and get detailed debug information from Thunder Client
-- **Parameters:**
-  - `projectDir` (required): Path to your Thunder Client project directory
-
-### 3. `tc_create`
+### 1. `tc_create`
 **Description:** Save endpoints or APIs to Thunder Client using tc-curl and automatically create collections and folders if needed.
 - **Usage:** Convert curl commands into Thunder Client requests with automatic organization
-- **Parameters:**
-  - `curlInput` (required): A full curl command starting with 'curl'
-  - `name` (required): A descriptive name for the request (minimum 2 characters)
-  - `collection` (optional): Collection name to organize the request
-  - `folder` (optional): Subfolder within the collection (requires collection to be specified)
-  - `projectDir` (required): Path to your Thunder Client project directory
+    
+### 2. `tc_help`
+**Description:** Show Thunder Client CLI help using `tc --help` in the given project directory.
+- **Usage:** Get comprehensive help documentation for Thunder Client CLI
+
+### 3. `tc_debug`
+**Description:** Show Thunder Client CLI debug information using `tc --debug` in the given project directory.
+- **Usage:** Troubleshoot and get detailed debug information from Thunder Client
 
 ## Installation & Setup
 
