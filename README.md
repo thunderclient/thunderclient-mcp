@@ -6,9 +6,14 @@ A Model Context Protocol (MCP) server that integrates Thunder Client functionali
 
 This MCP server provides three powerful tools for managing Thunder Client operations:
 
-### 1. `tc_create`
-**Description:** Save endpoints or APIs to Thunder Client using tc-curl and automatically create collections and folders if needed.
-- **Usage:** Convert curl commands into Thunder Client requests with automatic organization
+### 1. `tc_create`  
+**Description:**  
+Saves API endpoints to Thunder Client, automatically creating collections and folders if they do not already exist.  
+
+**Usage:**  
+- Use AI to analyze your current project and automatically generate API requests in Thunder Client, with the appropriate collection and folder created as needed.  
+- Add new requests to a specific collection in Thunder Client.  
+- Dynamically create a request using an AI-generated prompt.
     
 ### 2. `tc_help`
 **Description:** Show Thunder Client CLI help using `tc --help` in the given project directory.
