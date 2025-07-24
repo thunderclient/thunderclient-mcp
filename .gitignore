@@ -1,5 +1,6 @@
 # Node modules
 node_modules/
+thunder-tests
 
 # Build output
 dist/
@@ -20,7 +21,6 @@ pnpm-debug.log*
 Thumbs.db
 
 # IDE files
-.vscode/
 .idea/
 *.sublime-workspace
 *.sublime-project

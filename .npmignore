@@ -1,13 +1,9 @@
-# Node modules
-node_modules/
-
-# Build output
-dist/
-build/
-out/
-
-# Environment variables
-.env
+node_modules
+src
+thunder-tests
+patches
+tsconfig.json
+.vscode
 
 # Logs
 npm-debug.log*
@@ -19,15 +15,5 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# IDE files
-.vscode/
-.idea/
-*.sublime-workspace
-*.sublime-project
 
-# TypeScript cache
-*.tsbuildinfo
 
-# Misc
-coverage/
-*.log

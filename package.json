@@ -1,17 +1,18 @@
 {
   "name": "@thunderclient/mcp",
   "version": "1.0.0",
+  "description": "Thunder Client MCP Server",
   "main": "./dist/index.js`",
   "types": "./dist/index.d.ts",
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "rimraf dist && tsc",
     "postinstall": "npm install -g @thunderclient/cli@latest"
   },
   "keywords": [],
   "author": "Thunder Client Limited",
   "license": "MIT",
-  "description": "",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.16.0",
     "zod": "^3.25.76",
