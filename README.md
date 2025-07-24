@@ -84,11 +84,40 @@ mcpServers:
 2. Click on the **Tools** icon in the interface
 3. Scroll down and click **+ Add more tools**
 4. Select **+ Add MCP Server**
+![alt text](copolit_add_mcp_server.png)
 5. Choose **Stdio** as the connection type
 6. Enter the correct path to `node` and your `thunder-mcp/dist/index.js` file
 7. Save the configuration
 
 ---
+
+# Example Prompts
+
+This document contains simple example prompts for the `tc_create` tool to extract APIs from code files and save them to Thunder Client.
+
+## Extract APIs from Code Files
+
+### 1. Extract APIs from Current Project
+
+```
+"Get the endpoints from current project and save to Thunder Client with collection name 'My API'."
+```
+
+### 2. Extract APIs from Files and Folders
+
+```
+"Get the endpoints from app/main.py and save to Thunder Client with collection name 'E-commerce API' and folder name 'Products'."
+```
+
+```
+"Get the endpoints from src/routes/ folder and save to Thunder Client with collection name 'Node API'."
+```
+ 
+### 3. Create Simple HTTP Requests
+
+```
+"Create a POST request to https://api.example.com/users with a JSON body and with authorization header in Thunder Client."
+```
 
 ## Troubleshooting
 

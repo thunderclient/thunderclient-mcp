@@ -79,27 +79,3 @@ export type ToolArgs<T extends ToolName> = z.infer<
   (typeof toolDefinitions)[Extract<keyof typeof toolDefinitions, string>]["schema"]
 >;
 
-
-export const toolPrompts = {
-  tc_curl: {
-    name: "tc_curl",
-    description: "Execute a curl request via Thunder Client.",
-    prompt: `You are using the "tc_curl" tool to run a curl request via Thunder Client CLI.
-
-Ask the user for the following inputs:
-
-1. "curlInput" — A full curl command that starts with 'curl'. Example:
-   curl -X POST https://example.com/api -H "Content-Type: application/json" -d '{"name":"Thunder"}'
-
-2. "name" — A short label to identify the request. Example: "createUser"
-
-3. "collection" (optional) — A collection name to save the request under.
-
-4. "folder" (optional) — A subfolder inside the collection (only if collection is provided).
-
-5. "projectDir" — The full path to the user's Thunder Client workspace.
-
-Ensure the curl input starts with "curl " and that folder is only set if collection is also set.
-Return a JSON object with all fields.`,
-  },
-};
