@@ -105,23 +105,23 @@ This document contains simple example prompts for the `tc_create` tool to extrac
 ### 1. Extract APIs from Current Project
 
 ```
-"Get the endpoints from current project and save to Thunder Client with collection name 'My API'."
+"Get the endpoints from the current project and save them with collection name 'My API' using Thunder Client MCP."
 ```
 
 ### 2. Extract APIs from Files and Folders
 
 ```
-"Get the endpoints from app/main.py and save to Thunder Client with collection name 'E-commerce API' and folder name 'Products'."
+"Get the endpoints from app/main.py and save them with collection name 'E-commerce API' and folder name 'Products' using Thunder Client MCP."
 ```
 
 ```
-"Get the endpoints from src/routes/ folder and save to Thunder Client with collection name 'Node API'."
+"Get the endpoints from the src/routes/ folder and save them with collection name 'Node API' using Thunder Client MCP."
 ```
  
 ### 3. Create Simple HTTP Requests
 
 ```
-"Create a POST request to https://api.example.com/users with a JSON body and with authorization header in Thunder Client."
+"Create a POST request to https://api.example.com/users with a JSON body and an Authorization header using Thunder Client MCP."
 ```
 
 ## Troubleshooting
