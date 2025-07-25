@@ -3,10 +3,12 @@ import { ThunderClient } from "../thunder-client.js";
 import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { zodToMCPInputSchema } from "../utils/schema-converter.js";
 import { resolve } from "path";
+import { execSync } from 'child_process';
 
 interface ToolDefinition<TSchema extends ZodSchema, TResult> {
     name: string;
     description: string;
+    keywords?: string[];
     schema: TSchema;
     handler: (client: ThunderClient, args: z.infer<TSchema>) => Promise<TResult>;
 }
@@ -20,8 +22,11 @@ function defineTool<TSchema extends ZodSchema, TResult>(
 // Helper function to resolve project directory
 function resolveProjectDir(projectDir: string): string {
     if (projectDir === "." || projectDir === "./") {
-        return process.cwd();
+        // Execute pwd command and get the current working directory
+        const currentDir = execSync('pwd', { encoding: 'utf8' }).trim();
+        return currentDir;
     }
+
     return resolve(projectDir);
 }
 
@@ -29,7 +34,8 @@ export const toolDefinitions = {
 
     thunder_curl: defineTool({
         name: "tc_create",
-        description: "Saves API endpoints to Thunder Client, automatically creating collections and folders if they do not already exist.",
+        description: "Create API endpoints to Thunder Client, automatically creating collections and folders if they do not already exist.",
+        keywords: ["thunder client", "thunder client mcp", "tc mcp", "thunder mcp", "thunderclient"],
         schema: z
             .object({
                 curlInput: z
@@ -42,8 +48,8 @@ export const toolDefinitions = {
                 collection: z.string().optional(),
                 folder: z.string().optional(),
                 projectDir: z.string()
-                         .min(1, "projectDir is required")
-                         .describe("Full path to the project's directory (execute pwd cmd and get it)"),
+                    .min(1, "projectDir is required")
+                    .describe("Get the full path to the project's directory (use process.cwd() and get it)."),
             })
             .refine(data => !(data.folder && !data.collection), {
                 message: "If 'folder' is provided, you must also provide 'collection'.",
@@ -52,26 +58,16 @@ export const toolDefinitions = {
         handler: async (client, args) => client.runCurl({ ...args, projectDir: resolveProjectDir(args.projectDir.trim()) }),
     }),
 
-    thunder_help: defineTool({
-        name: "tc_help",
-        description: "Show Thunder Client CLI help using `tc --help` in the given project directory.",
-        schema: z.object({
-            projectDir: z.string()
-                         .min(1, "projectDir is required")
-                         .describe("Full path to the project's directory (execute pwd cmd and get it)"),
-        }),
-        handler: async (client, args) => client.thunder_help(resolveProjectDir(args.projectDir.trim())),
-    }),
-
     thunder_debug: defineTool({
         name: "tc_debug",
-        description: "Show Thunder Client CLI debug using `tc --debug` in the given project directory.",
+        description: "Runs the Thunder Client debug command and display the result.",
+        keywords: ["thunder client", "thunder client mcp", "tc mcp", "thunder mcp", "thunderclient"],
         schema: z.object({
             projectDir: z.string()
-                         .min(1, "projectDir is required")
-                         .describe("Full path to the project's directory (execute pwd cmd and get it)"),
+                .min(1, "projectDir is required")
+                .describe("Get the full path to the project's directory (use process.cwd() and get it)."),
         }),
-        handler: async (client, args) => client.thunder_debug(resolveProjectDir(args.projectDir.trim())),
+        handler: async (client, args) => client.runDebug(resolveProjectDir(args.projectDir.trim())),
     }),
 
 } as const;

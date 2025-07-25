@@ -1,6 +1,8 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as fs from "fs";
+import pkg from '../package.json' with { type: 'json' };
+const version = pkg.version;
 
 const execAsync = promisify(exec);
 
@@ -28,8 +30,15 @@ export class ThunderClient {
 
     private async execCommand(command: string, cwd: string): Promise<{ success: boolean; result?: string; error?: string }> {
         try {
-            const { stdout } = await execAsync(command, { cwd });
-            return { success: true, result: stdout };
+            const { stdout, stderr } = await execAsync(command, { cwd });
+            let succeeded = true;
+            let errorMessage: string | undefined = stderr ? stderr.trim() : undefined;
+            if ((stderr && stderr.trim()) || stdout?.trim().toLowerCase().includes("error")) {
+                succeeded = false;
+                errorMessage = errorMessage || stdout?.trim();
+            }
+
+            return { success: succeeded, result: stdout?.trim(), error: errorMessage };
         } catch (error: any) {
             return {
                 success: false,
@@ -38,20 +47,20 @@ export class ThunderClient {
         }
     }
 
-    async thunder_help(projectDir: string) {
+    async runHelp(projectDir: string): Promise<{ success: boolean; error?: string, projectDir?: string, version: string }> {
         const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error, projectDir };
+        if (!check.valid) return { success: false, error: check.error, projectDir, version };
 
         const result = await this.execCommand("tc --help", projectDir);
-        return { ...result, projectDir, cwd: process.cwd() };
+        return { ...result, projectDir, version };
     }
 
-    async thunder_debug(projectDir: string) {
+    async runDebug(projectDir: string): Promise<{ success: boolean; error?: string, projectDir?: string, version: string }> {
         const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error, projectDir };
+        if (!check.valid) return { success: false, error: check.error, projectDir, version };
 
         const result = await this.execCommand("tc --debug", projectDir);
-        return { ...result, projectDir, cwd: process.cwd() };
+        return { ...result, projectDir, version, };
     }
 
     async runCurl({
@@ -66,13 +75,13 @@ export class ThunderClient {
         collection?: string;
         folder?: string;
         projectDir: string;
-    }): Promise<{ success: boolean; error?: string }> {
+    }): Promise<{ success: boolean; error?: string, projectDir?: string, version: string }> {
         const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
+        if (!check.valid) return { success: false, error: check.error, version };
 
         const trimmedInput = curlInput.trim();
         if (!trimmedInput.toLowerCase().startsWith("curl ")) {
-            return { success: false, error: "Input must start with 'curl '" };
+            return { success: false, error: "Input must start with 'curl '", version };
         }
 
         let curlArgs = trimmedInput.slice(5).trim();
@@ -80,7 +89,7 @@ export class ThunderClient {
             curlArgs = normalizeCurlInputForWindows(curlArgs);
         }
 
-        let cmd = `tc curl ${curlArgs} --ws .`;
+        let cmd = `tc curl ${curlArgs}`;
         if (name) cmd += ` --name "${name}"`;
         if (collection) cmd += ` --col "${collection}"`;
         if (folder) cmd += ` --fol "${folder}"`;
@@ -88,9 +97,9 @@ export class ThunderClient {
 
         const result = await this.execCommand(cmd, projectDir);
         if (result.success) {
-            return { success: true }; // ✅ Return only success: true
+            return { ...result, projectDir, version }; // ✅ Return only success: true
         } else {
-            return { success: false, error: result.error };
+            return { success: false, error: result.error, projectDir, version };
         }
     }
 

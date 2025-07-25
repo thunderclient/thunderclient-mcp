@@ -1,6 +1,6 @@
 # Thunder Client MCP
 
-A Model Context Protocol (MCP) server that integrates Thunder Client functionality into various AI development environments including Cline, Continue.dev, and GitHub Copilot.
+The Thunder Client MCP server leverages AI to create requests and collections. It can be used in various AI development environments, including Cline, Continue.dev, and GitHub Copilot.
 
 ## Available Tools
 
@@ -17,13 +17,7 @@ Saves API endpoints to Thunder Client, automatically creating collections and fo
 - Add new requests to a specific collection in Thunder Client.
 - Dynamically create a request using an AI-generated prompt.
 
-### 2. `tc_help`
-
-**Description:** Show Thunder Client CLI help using `tc --help` in the given project directory.
-
-- **Usage:** Get comprehensive help documentation for Thunder Client CLI
-
-### 3. `tc_debug`
+### 2. `tc_debug`
 
 **Description:** Show Thunder Client CLI debug information using `tc --debug` in the given project directory.
 
