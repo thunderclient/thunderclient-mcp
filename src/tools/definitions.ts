@@ -26,23 +26,6 @@ function resolveProjectDir(projectDir: string): string {
 }
 
 export const toolDefinitions = {
-    thunder_help: defineTool({
-        name: "tc_help",
-        description: "Show Thunder Client CLI help using `tc --help` in the given project directory.",
-        schema: z.object({
-            projectDir: z.string().min(1, "projectDir is required"),
-        }),
-        handler: async (client, args) => client.thunder_help(resolveProjectDir(args.projectDir.trim())),
-    }),
-
-    thunder_debug: defineTool({
-        name: "tc_debug",
-        description: "Show Thunder Client CLI debug using `tc --debug` in the given project directory.",
-        schema: z.object({
-            projectDir: z.string().min(1, "projectDir is required"),
-        }),
-        handler: async (client, args) => client.thunder_debug(resolveProjectDir(args.projectDir.trim())),
-    }),
 
     thunder_curl: defineTool({
         name: "tc_create",
@@ -58,7 +41,9 @@ export const toolDefinitions = {
                 name: z.string().min(2, { message: "Name must be at least 2 characters" }),
                 collection: z.string().optional(),
                 folder: z.string().optional(),
-                projectDir: z.string().min(1, { message: "projectDir is required" }),
+                projectDir: z.string()
+                         .min(1, "projectDir is required")
+                         .describe("Full path to the project's directory (execute pwd cmd and get it)"),
             })
             .refine(data => !(data.folder && !data.collection), {
                 message: "If 'folder' is provided, you must also provide 'collection'.",
@@ -66,6 +51,29 @@ export const toolDefinitions = {
             }),
         handler: async (client, args) => client.runCurl({ ...args, projectDir: resolveProjectDir(args.projectDir.trim()) }),
     }),
+
+    thunder_help: defineTool({
+        name: "tc_help",
+        description: "Show Thunder Client CLI help using `tc --help` in the given project directory.",
+        schema: z.object({
+            projectDir: z.string()
+                         .min(1, "projectDir is required")
+                         .describe("Full path to the project's directory (execute pwd cmd and get it)"),
+        }),
+        handler: async (client, args) => client.thunder_help(resolveProjectDir(args.projectDir.trim())),
+    }),
+
+    thunder_debug: defineTool({
+        name: "tc_debug",
+        description: "Show Thunder Client CLI debug using `tc --debug` in the given project directory.",
+        schema: z.object({
+            projectDir: z.string()
+                         .min(1, "projectDir is required")
+                         .describe("Full path to the project's directory (execute pwd cmd and get it)"),
+        }),
+        handler: async (client, args) => client.thunder_debug(resolveProjectDir(args.projectDir.trim())),
+    }),
+
 } as const;
 
 export const tools: Tool[] = Object.values(toolDefinitions).map(def => ({
