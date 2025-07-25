@@ -5,6 +5,8 @@ thunder-reports
 patches
 tsconfig.json
 .vscode
+.continue
+.cline
 
 # Logs
 npm-debug.log*

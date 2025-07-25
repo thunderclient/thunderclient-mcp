@@ -2,6 +2,9 @@
 node_modules/
 thunder-tests
 thunder-reports
+.vscode
+.continue
+.cline
 
 # Build output
 dist/
