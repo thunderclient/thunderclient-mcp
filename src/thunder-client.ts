@@ -35,14 +35,16 @@ export class ThunderClient {
             let errorMessage: string | undefined = stderr ? stderr.trim() : undefined;
             if ((stderr && stderr.trim()) || stdout?.trim().toLowerCase().includes("error")) {
                 succeeded = false;
-                errorMessage = errorMessage || stdout?.trim();
+                if (stdout?.trim().toLowerCase().includes("error")) {
+                    errorMessage = stdout?.trim();
+                }
             }
 
             return { success: succeeded, result: stdout?.trim(), error: errorMessage };
         } catch (error: any) {
             return {
                 success: false,
-                error: error?.stderr || error?.message || "Unknown error",
+                error: error?.message || "Unknown error",
             };
         }
     }
@@ -99,7 +101,7 @@ export class ThunderClient {
         if (result.success) {
             return { ...result, projectDir, version }; // ✅ Return only success: true
         } else {
-            return { success: false, error: result.error, projectDir, version };
+            return { ...result, projectDir, version };
         }
     }
 
