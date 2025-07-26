@@ -11,7 +11,7 @@ function normalizeCurlInputForWindows(curlInput: string): string {
     return curlInput.replace(
         /(-d|--data(?:-raw)?)\s+(['"])([\s\S]*?)\2/g,
         (_, flag: string, _quote: string, rawBody: string) => {
-            const escapedBody = rawBody.replace(/"/g, '\\"');
+            const escapedBody = rawBody.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
             return `${flag} "${escapedBody}"`;
         }
     );
