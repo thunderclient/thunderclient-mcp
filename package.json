@@ -1,6 +1,6 @@
 {
   "name": "thunderclient-mcp",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Thunder Client MCP Server",
   "main": "dist/index.js`",
   "types": "dist/index.d.ts",
