@@ -1,6 +1,6 @@
 # Thunder Client MCP Server
 
-The Thunder Client MCP server enables customers to integrate AI for generating requests and collections. It can be used in various AI development environments, including Cline, Continue.dev, and GitHub Copilot..
+The Thunder Client MCP server enables customers to integrate with AI tools to generate requests and collections. It is compatible with various AI development environments, including Cline, Continue.dev, and GitHub Copilot.
 
 ## Requirements
 
