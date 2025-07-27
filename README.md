@@ -78,7 +78,7 @@ mcpServers:
 2. Click on the **Tools** icon in the interface
 3. Scroll down and click **+ Add more tools**
 4. Select **+ Add MCP Server**
-   ![alt text](/public/copolit_add_mcp_server.png)
+   ![alt text](https://raw.githubusercontent.com/thunderclient/thunderclient-mcp/60b7940376542312c18e9e6b8f4f199758d08636/public/copolit_add_mcp_server.png?token=GHSAT0AAAAAAC243MZCW2PJGYDQ3VYBVXNM2EFZANA)
 5. Choose **Stdio** as the connection type
 6. Enter the command to run as `npx thunderclient-mcp`
 7. Enter the mcp name `thunderclient-mcp-server-....`
