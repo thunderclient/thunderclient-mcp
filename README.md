@@ -2,6 +2,11 @@
 
 The Thunder Client MCP server leverages AI to create requests and collections. It can be used in various AI development environments, including Cline, Continue.dev, and GitHub Copilot.
 
+## Requirements
+
+- A **Business** or **Enterprise** plan subscription is required to use the Thunder Client MCP Server.
+- View Thunder Client pricing plans [here](https://www.thunderclient.com/pricing).
+
 ## Available Tools
 
 This MCP server provides three powerful tools for managing Thunder Client operations:
@@ -23,9 +28,7 @@ Saves API endpoints to Thunder Client, automatically creating collections and fo
 
 - **Usage:** Troubleshoot and get detailed debug information from Thunder Client
 
-## Requirements
 
-- A **Business** or **Enterprise** plan subscription is required to use the Thunder Client MCP Server.
 
 ## Configuration for Different Environments
 
