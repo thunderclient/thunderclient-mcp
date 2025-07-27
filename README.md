@@ -23,17 +23,6 @@ Saves API endpoints to Thunder Client, automatically creating collections and fo
 
 - **Usage:** Troubleshoot and get detailed debug information from Thunder Client
 
-## Installation & Setup
-
-### Prerequisites
-
-```bash
-npm i
-npm run build
-```
-
-After building, a `dist` folder will be created. Copy the `index.js` path from the `dist` folder - this path will be used in your MCP server configuration.
-
 ## Configuration for Different Environments
 
 ### For Cline
@@ -74,7 +63,7 @@ version: 0.0.1
 schema: v1
 mcpServers:
   - name: Thunder Client MCP Server
-    command: node
+    command: npx
     args:
       - thunderclient-mcp
 ```
@@ -125,6 +114,15 @@ This document contains simple example prompts for the `tc_create` tool to extrac
 ```
 "Create a POST request to https://api.example.com/users with a JSON body and an Authorization header using Thunder Client MCP."
 ```
+
+## Running Locally
+
+```bash
+npm i
+npm run build
+```
+
+After building, a `dist` folder will be created. Copy the `index.js` path from the `dist` folder - this path will be used in your MCP server configuration.
 
 ## Troubleshooting
 
