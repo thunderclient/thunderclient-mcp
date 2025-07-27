@@ -23,6 +23,10 @@ Saves API endpoints to Thunder Client, automatically creating collections and fo
 
 - **Usage:** Troubleshoot and get detailed debug information from Thunder Client
 
+## Requirements
+
+- A **Business** or **Enterprise** plan subscription is required to use the Thunder Client MCP Server.
+
 ## Configuration for Different Environments
 
 ### For Cline
