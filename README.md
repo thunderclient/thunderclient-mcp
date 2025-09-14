@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/thunderclient-thunderclient-mcp-badge.png)](https://mseep.ai/app/thunderclient-thunderclient-mcp)
+
 # Thunder Client MCP Server
 
 The Thunder Client MCP server enables customers to integrate with AI tools to create requests and collections. It is compatible with various AI development environments, including Cline, Continue.dev, and GitHub Copilot.
