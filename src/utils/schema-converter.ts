@@ -9,7 +9,7 @@ export function zodToMCPInputSchema(schema: z.ZodSchema): {
     description?: string;
 } {
     try {
-        const jsonSchema = zodToJsonSchema(schema, {
+        const jsonSchema = zodToJsonSchema(schema as any, {
             target: "jsonSchema7",
             $refStrategy: "none",
             definitions: {},
