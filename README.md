@@ -1,4 +1,7 @@
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/thunderclient-thunderclient-mcp-badge.png)](https://mseep.ai/app/thunderclient-thunderclient-mcp)
+<p align="center">
+  <img src="https://github.com/thunderclient/thunder-client-support/blob/21d62c97dcc8168dc678b165fe678fd12c2f476b/images/thunder-icon.png" width="120" height="120" />
+</p>
+
 
 # Thunder Client MCP Server
 
@@ -153,3 +156,6 @@ After building, a `dist` folder will be created. Copy the `index.js` path from t
 ## Contributing
 
 Feel free to contribute to this project by submitting issues or pull requests to improve functionality and compatibility with different AI development environments.
+
+## Audit
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/thunderclient-thunderclient-mcp-badge.png)](https://mseep.ai/app/thunderclient-thunderclient-mcp)
