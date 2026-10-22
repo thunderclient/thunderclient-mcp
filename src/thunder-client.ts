@@ -7,19 +7,6 @@ const version = pkg.version;
 
 const execAsync = promisify(exec);
 
-// Support multiple data flags in curl
-function normalizeCurlInputForWindows(curlInput: string): string {
-    return curlInput.replace(
-        /(-d|--data(?:-raw)?)\s+(['"])([\s\S]*?)\2/g,
-        (_, flag: string, _quote: string, rawBody: string) => {
-            const escapedBody = rawBody
-                    .replace(/\\/g, '\\\\')
-                    .replace(/"/g, '\\"');
-            return `${flag} "${escapedBody}"`;
-        }
-    );
-}
-
 // aws/ntlm have no credential fields in the schema, so saving them would silently drop the keys
 function checkAuthType(auth?: Record<string, any>): string | undefined {
     const type = auth?.type;
@@ -79,14 +66,19 @@ export class ThunderClient {
             if (msg.includes("ENOENT") || msg.includes("command not found") || msg.includes("not recognized")) {
                 return { success: false, error: "Thunder Client CLI not found. Install it with: npm install -g @thunderclient/cli" };
             }
-            return { success: false, error: msg };
+            // a non-zero exit (e.g. "Collection not found") prints the reason on stdout, not in the error message
+            const output: string = (error?.stdout || "").toString().trim();
+            return { success: false, error: output || msg, ...(output && { result: output }) };
         }
     }
 
+    // every CLI call is `tc --mcp <json>`; base64 needs no shell quoting, so it passes through cmd.exe and sh unchanged
+    private mcpCommand(input: Record<string, any>): string {
+        return `tc --mcp ${Buffer.from(JSON.stringify(input)).toString("base64")}`;
+    }
+
     private async mcpCmd(input: Record<string, any>, projectDir: string): Promise<any> {
-        // base64 needs no shell quoting, so it passes through cmd.exe and sh unchanged
-        const arg = Buffer.from(JSON.stringify(input)).toString("base64");
-        const { stdout, stderr } = await execAsync(`tc --mcp ${arg}`, { cwd: projectDir }).catch(e => {
+        const { stdout, stderr } = await execAsync(this.mcpCommand(input), { cwd: projectDir }).catch(e => {
             const msg: string = e.message || "";
             if (msg.includes("ENOENT") || msg.includes("command not found") || msg.includes("not recognized")) {
                 return { stdout: "", stderr: "Thunder Client CLI not found. Install it with: npm install -g @thunderclient/cli" };
@@ -260,12 +252,6 @@ export class ThunderClient {
         return result;
     }
 
-    private async getActiveEnvName(projectDir: string): Promise<string | undefined> {
-        const result = await this.mcpCmd({ cmd: "list-env" }, projectDir);
-        if (!result?.environments) return undefined;
-        return result.environments.find((e: any) => e.active)?.name;
-    }
-
     async runCollection({
         projectDir,
         collectionName,
@@ -288,31 +274,18 @@ export class ThunderClient {
         const check = this.validateProjectDir(projectDir);
         if (!check.valid) return { success: false, error: check.error };
 
-        const resolvedEnv = env || await this.getActiveEnvName(projectDir);
-
-        // --fol requires folder _id, not folder name — resolve it from the list
-        let resolvedFolderId: string | undefined;
-        if (folderName) {
-            const listResult = await this.mcpCmd({ cmd: "list" }, projectDir);
-            const folder = (listResult?.result ?? []).find(
-                (i: any) => i.type === "folder" &&
-                    i.colName === collectionName &&
-                    i.name.toLowerCase() === folderName.toLowerCase()
-            );
-            if (!folder) {
-                return { success: false, error: `Folder "${folderName}" not found in collection "${collectionName}".` };
-            }
-            resolvedFolderId = folder._id;
-        }
-
-        let cmd = `tc --col "${collectionName}" --report "json"`;
-        if (resolvedFolderId) cmd += ` --fol "${resolvedFolderId}"`;
-        if (resolvedEnv) cmd += ` --env "${resolvedEnv}"`;
-        if (stopOnFail) cmd += ` --stop-on-fail`;
-        if (iterations && iterations > 1) cmd += ` --iterations ${iterations}`;
-        if (delay && delay > 0) cmd += ` --delay ${delay}`;
-        if (concurrent && concurrent > 1) cmd += ` --concurrent ${concurrent}`;
-        cmd += ` --mcp`;
+        // the CLI resolves the folder by name and uses the active env unless one is given
+        const cmd = this.mcpCommand({
+            cmd: "run-collection",
+            collectionName,
+            folderName,
+            env,
+            report: "json",
+            stopOnFail: stopOnFail || undefined,
+            iterations: iterations && iterations > 1 ? iterations : undefined,
+            delay: delay && delay > 0 ? delay : undefined,
+            concurrent: concurrent && concurrent > 1 ? concurrent : undefined,
+        });
 
         const reportsDir = path.join(projectDir, "thunder-reports");
         const beforeFiles = fs.existsSync(reportsDir)
@@ -357,7 +330,7 @@ export class ThunderClient {
             return {
                 success: failed === 0,
                 report,
-                envUsed: resolvedEnv,
+                envUsed: report.environmentName || env,
                 summary: { total, passed, failed },
             };
         } catch (e: any) {
@@ -370,8 +343,7 @@ export class ThunderClient {
         if (!check.valid) return { success: false, error: check.error };
 
         const [cliResult, listResult, envResult] = await Promise.all([
-            // --mcp: free plan rules instead of the paid-only licence gate
-            this.execCommand("tc --debug --mcp", projectDir),
+            this.execCommand(this.mcpCommand({ cmd: "debug" }), projectDir),
             this.mcpCmd({ cmd: "list" }, projectDir),
             this.mcpCmd({ cmd: "list-env" }, projectDir),
         ]);
@@ -441,11 +413,8 @@ export class ThunderClient {
         const check = this.validateProjectDir(projectDir);
         if (!check.valid) return { success: false, error: check.error };
 
-        const resolvedEnv = env || await this.getActiveEnvName(projectDir);
-        let cmd = `tc "${nameOrId}"`;
-        if (resolvedEnv) cmd += ` --env "${resolvedEnv}"`;
-        // marks the run as MCP-invoked so the CLI can apply the free plan rules
-        cmd += ` --mcp`;
+        // the CLI uses the active env unless one is given
+        const cmd = this.mcpCommand({ cmd: "run-request", nameOrId, env });
 
         const result = await this.execCommand(cmd, projectDir, RUN_MAX_BUFFER);
         // the response body can contain the word "error" - only CLI error lines mean the run failed
@@ -460,7 +429,7 @@ export class ThunderClient {
         // report the env the CLI used - an unknown name falls back to the active one
         const actualEnv = (result.result || "").match(/^Environment:\s+(.+?)\s*$/m)?.[1]
             ?.replace(/\s*\((Active|Inactive)\)\s*$/i, "").trim();
-        return { ...result, envUsed: actualEnv || resolvedEnv };
+        return { ...result, envUsed: actualEnv || env };
     }
 
     async runCurl({
@@ -485,7 +454,7 @@ export class ThunderClient {
         preReq?: Record<string, any>;
         postReq?: Record<string, any>;
         docs?: string[];
-    }): Promise<{ success: boolean; error?: string; requestName?: string; savedTo?: string; requestId?: string; warning?: string; limitReached?: boolean; limit?: any; message?: string }> {
+    }): Promise<{ success: boolean; error?: string; requestName?: string; savedTo?: string; requestId?: string; limitReached?: boolean; limit?: any; message?: string }> {
         const check = this.validateProjectDir(projectDir);
         if (!check.valid) return { success: false, error: check.error };
         const authError = checkAuthType(auth);
@@ -496,15 +465,7 @@ export class ThunderClient {
             return { success: false, error: "Input must start with 'curl '" };
         }
 
-        let curlArgs = trimmedInput.slice(5).trim();
-        if (process.platform === "win32") {
-            curlArgs = normalizeCurlInputForWindows(curlArgs);
-        }
-
-        let cmd = `tc curl ${curlArgs}`;
-        if (name) cmd += ` --name "${name}"`;
-        if (collection) cmd += ` --col "${collection}"`;
-        if (folder) cmd += ` --fol "${folder}"`;
+        const curlArgs = trimmedInput.slice(5).trim();
 
         const reqData: Record<string, any> = {};
         if (auth) reqData.auth = auth;
@@ -529,36 +490,15 @@ export class ThunderClient {
                 if (params.length > 0) reqData.params = params;
             }
         }
-        if (Object.keys(reqData).length > 0) {
-            cmd += ` --req-data ${Buffer.from(JSON.stringify(reqData)).toString("base64")}`;
-        }
-
-        cmd += ` --mcp`;
-
-        const result = await this.execCommand(cmd, projectDir);
-        if (result.success) {
-            const savedTo = folder ? `${collection} > ${folder}` : collection || "Activity";
-            // pass through the CLI warning, else the save looks complete
-            const warning = (result.result || "").match(/^Warning:\s*(.+)$/m)?.[1]?.trim();
-            const requestId = (result.result || "").match(/^Request Id:\s*(\S+)\s*$/m)?.[1];
-            return { success: true, requestName: name, savedTo, ...(requestId && { requestId }), ...(warning && { warning }) };
-        }
-
-        // the curl path reports limits as a JSON line in stdout - lift it to the top level
-        const limitLine = (result.result || result.error || "")
-            .split("\n")
-            .map(l => l.trim())
-            .find(l => l.startsWith("{") && l.includes("\"limitReached\""));
-        if (limitLine) {
-            try {
-                const parsed = JSON.parse(limitLine);
-                if (parsed?.limitReached) {
-                    return { ...result, ...parsed };
-                }
-            } catch { /* not JSON after all - fall through to the raw result */ }
-        }
-
-        return result;
+        // the curl text goes to the CLI as data, not through the shell; the CLI replies with JSON
+        return this.mcpCmd({
+            cmd: "create-request",
+            curl: trimmedInput,
+            name,
+            collectionName: collection,
+            folderName: folder,
+            ...reqData,
+        }, projectDir);
     }
 
 }
