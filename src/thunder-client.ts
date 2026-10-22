@@ -86,7 +86,7 @@ export class ThunderClient {
     private async mcpCmd(input: Record<string, any>, projectDir: string): Promise<any> {
         // base64 needs no shell quoting, so it passes through cmd.exe and sh unchanged
         const arg = Buffer.from(JSON.stringify(input)).toString("base64");
-        const { stdout, stderr } = await execAsync(`tc --mcp-cmd ${arg}`, { cwd: projectDir }).catch(e => {
+        const { stdout, stderr } = await execAsync(`tc --mcp ${arg}`, { cwd: projectDir }).catch(e => {
             const msg: string = e.message || "";
             if (msg.includes("ENOENT") || msg.includes("command not found") || msg.includes("not recognized")) {
                 return { stdout: "", stderr: "Thunder Client CLI not found. Install it with: npm install -g @thunderclient/cli" };
