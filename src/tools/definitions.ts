@@ -18,11 +18,11 @@ function defineTool<TSchema extends ZodSchema, TResult>(
 }
 
 // Shared parameter descriptions
-const projectDirDesc = "Absolute path to the project directory. Example: '/Users/john/my-project'. Use the path returned by debugInfo.";
+const projectDirDesc = "Absolute path to the project root directory. Example: '/Users/john/my-project'.";
 
 const authSchema = z.object({
     type: z.enum(["none", "inherit", "basic", "bearer", "oauth2", "ntlm", "aws"])
-        .describe("Authentication type. 'inherit' uses the parent collection's auth settings."),
+        .describe("Authentication type. 'inherit' uses the parent collection's auth settings. 'aws' and 'ntlm' are rejected: their credentials must be set in the Thunder Client UI."),
     bearer: z.string().optional()
         .describe("Bearer token value. Required when type is 'bearer'. Supports environment variables e.g. '{{accessToken}}'."),
     basic: z.object({
@@ -53,42 +53,29 @@ const authSchema = z.object({
         .describe("OAuth2 configuration. Required when type is 'oauth2'. Example: {grantType:'client_credentials',tokenUrl:'https://auth.example.com/token',clientId:'{{clientId}}',clientSecret:'{{clientSecret}}'}"),
 });
 
-// authSchema usage examples (for .describe on the auth field in each tool):
-// bearer:  {type:'bearer', bearer:'{{accessToken}}'}
-// basic:   {type:'basic', basic:{username:'{{username}}', password:'{{password}}'}}
-// oauth2:  {type:'oauth2', oauth2:{grantType:'client_credentials', tokenUrl:'https://auth.example.com/token', clientId:'{{clientId}}', clientSecret:'{{clientSecret}}'}}
-// inherit: {type:'inherit'}
-// none:    {type:'none'}
 const authExamples = "Examples — bearer: {type:'bearer',bearer:'{{accessToken}}'} | basic: {type:'basic',basic:{username:'{{user}}',password:'{{pass}}'}} | oauth2: {type:'oauth2',oauth2:{grantType:'client_credentials',tokenUrl:'https://auth.example.com/token',clientId:'{{clientId}}',clientSecret:'{{clientSecret}}'}} | inherit: {type:'inherit'}";
 
 const testsSchema = z.array(z.object({
     type: z.enum(["res-code", "res-body", "res-time", "json-query", "Content-Type", "Content-Length", "custom-header", "set-env-var"])
         .describe("Assertion type. 'res-code'=HTTP status code, 'json-query'=JSON field check, 'res-body'=raw body text, 'res-time'=response time in ms, 'Content-Type'/'Content-Length'=response headers, 'custom-header'=any response header, 'set-env-var'=extract a value to an environment variable."),
     custom: z.string().optional()
-        .describe("Path or key for the assertion target. Required for 'json-query', 'set-env-var', and 'custom-header'. JSON path examples: 'json.field', 'json.a.b.c' (nested), 'json[0].field' (array index), 'json[-1].field' (last item), 'json.items[*].id' (all items), 'json.items[name=thunder].id' (filter by field value), 'json[\"key.with.dots\"]' (quoted key). Use bracket notation for array indices — 'json[0].id' is correct, 'json.0.id' is not. For response headers: 'header.Content-Type'. For cookies: 'cookie.name'. For raw body: 'text'."),
+        .describe("Path or key for the assertion target. Required for 'json-query', 'set-env-var', and 'custom-header'. JSON path examples: 'json.field', 'json.a.b.c' (nested), 'json[0].field' (array index), 'json[-1].field' (last item), 'json.items[*].id' (all items), 'json.items[name=thunder].id' (filter by field value), 'json[\"key.with.dots\"]' (quoted key). Use bracket notation for array indices — 'json[0].id' is correct, 'json.0.id' is not. For 'custom-header': the header name only, e.g. 'X-Request-Id'. In 'json-query' and 'set-env-var', read a response header with 'header.Content-Type' and a cookie with 'cookie.name'. For raw body: 'text'."),
     action: z.enum(["equal", "notequal", "contains", "notcontains", "istype", "isjson", "setto", "regex", ">", ">=", "<", "<="])
         .describe("Comparison operator. 'istype' checks the value type (string/number/array/object/boolean/null). 'setto' extracts a value and is used with 'set-env-var'. Numeric operators (>, >=, <, <=) apply to 'res-time'."),
     value: z.string().optional()
         .describe("Expected value. For 'res-code': '200'. For 'istype': string/number/array/object/boolean/null. For 'res-time': milliseconds e.g. '500'. For 'set-env-var': must be a {{varName}} placeholder e.g. '{{authToken}}'. For 'regex': the pattern string."),
 }));
 
-// testsSchema usage examples (for .describe on the tests field in each tool):
-// check status:          {type:'res-code', action:'equal', value:'200'}
-// check JSON field:      {type:'json-query', custom:'json.id', action:'istype', value:'number'}
-// check array item:      {type:'json-query', custom:'json[0].name', action:'equal', value:'John'}
-// check response time:   {type:'res-time', action:'<=', value:'2000'}
-// check header:          {type:'custom-header', custom:'header.X-Request-Id', action:'contains', value:'req-'}
-// extract to env var:    {type:'set-env-var', custom:'json.token', action:'setto', value:'{{accessToken}}'}
-const testsExamples = "Examples — status: {type:'res-code',action:'equal',value:'200'} | JSON field: {type:'json-query',custom:'json.id',action:'istype',value:'number'} | array item: {type:'json-query',custom:'json[0].name',action:'equal',value:'John'} | response time: {type:'res-time',action:'<=',value:'2000'} | extract to env: {type:'set-env-var',custom:'json.token',action:'setto',value:'{{accessToken}}'} | response header: {type:'custom-header',custom:'header.X-Request-Id',action:'contains',value:'req-'}";
+const testsExamples = "Examples — status: {type:'res-code',action:'equal',value:'200'} | JSON field: {type:'json-query',custom:'json.id',action:'istype',value:'number'} | array item: {type:'json-query',custom:'json[0].name',action:'equal',value:'John'} | response time: {type:'res-time',action:'<=',value:'2000'} | extract to env: {type:'set-env-var',custom:'json.token',action:'setto',value:'{{accessToken}}'} | response header: {type:'custom-header',custom:'X-Request-Id',action:'contains',value:'req-'}";
 
 const preReqSchema = z.object({
     inlineScripts: z.array(z.string()).optional()
-        .describe("JavaScript statements to execute before the request. Each string is one statement. Example: [\"tc.setVar('timestamp', Date.now().toString())\"]"),
+        .describe("JavaScript statements to execute before the request is sent. Each array item is one statement. Example: [\"tc.setVar('timestamp', Date.now().toString())\", \"tc.request.setHeader('X-Nonce', tc.getVar('nonce'))\"] — read tc://docs for the full scripting API reference."),
 });
 
 const postReqSchema = z.object({
     inlineScripts: z.array(z.string()).optional()
-        .describe("JavaScript statements to execute after the response. Access response data via tc.response.json, tc.response.status, tc.response.headers. Example: [\"tc.setVar('userId', tc.response.json.id?.toString())\"]"),
+        .describe("JavaScript statements to execute after the response is received. Each array item is one statement. Use tc.response.json, tc.response.status, tc.response.headers to read the response. Use tc.setVar() to extract values. Use tc.test(name, bool) to write assertions. Example: [\"tc.test('ok', tc.response.status === 200)\", \"tc.setVar('userId', tc.response.json.id?.toString())\"] — read tc://docs for the full scripting API reference."),
 });
 
 const docsDesc = "Documentation for this item. Array of markdown strings. Use the field name 'docs' — not 'notes' or 'description'. Example: ['## Create User', 'Creates a new user account.', '**Returns:** the created user id']";
@@ -97,7 +84,7 @@ export const toolDefinitions = {
 
     thunder_debug: defineTool({
         name: "debugInfo",
-        description: "Returns diagnostic information about the Thunder Client setup in the given project directory, including CLI version, HTTP library, data path, all collection names, and all environment names. Run this first to verify the project is configured correctly and to discover available collections and environments. Environment variable values are never returned.",
+        description: "Returns Thunder Client setup info: CLI version, data path, collection names, and environment names. Run this first before any other tool. Environment variable values are never returned. If no environment exists, ask the user to create one in Thunder Client UI — never create or write environment files directly.",
         schema: z.object({
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
@@ -107,7 +94,7 @@ export const toolDefinitions = {
 
     thunder_list: defineTool({
         name: "getCollections",
-        description: "Returns a flat list of all collections, folders, and requests in the project. Each item includes its _id, name, and type ('collection' | 'folder' | 'request'). Folders also include colId and colName. Requests also include method, colId, colName, and containerId (the parent folder _id, or empty string if at the collection root). Also returns activityRequests count — the number of requests in the Thunder Client Activity tab. The Activity tab holds recently run requests that have not been saved to a named collection yet (they have colId 'history'). Users can save them to a collection via the Thunder Client UI. Set includeActivity to true only when the user explicitly asks to see Activity tab requests.",
+        description: "Returns a flat list of all collections, folders, and requests with their _id, name, type, method, and parent info. Use this to discover existing items and obtain IDs before calling other tools. Set includeActivity to true only when the user explicitly asks to see Activity tab requests.",
         schema: z.object({
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
@@ -119,7 +106,7 @@ export const toolDefinitions = {
 
     thunder_list_by_id: defineTool({
         name: "getDataById",
-        description: "Returns the full details of a single collection, folder, or request by its _id. For a collection: returns settings, folders, and request list. For a folder: returns settings and all requests inside it. For a request: returns url, method, headers, params, body, auth, tests, preReq, and postReq. Sensitive auth values (tokens, passwords, secrets) are masked — only {{varName}} placeholders are shown as-is. Use getCollections first to obtain the _id.",
+        description: "Returns full details of a single collection, folder, or request by its _id. For a request: returns url, method, headers, params, body, auth, tests, and scripts. Sensitive auth values are masked. Use getCollections first to obtain the _id. Do not use this to read environment files — environment variable values are never returned.",
         schema: z.object({
             id: z.string().min(1, "id is required")
                 .describe("The _id of the collection, folder, or request to retrieve. Obtain from getCollections. Example: 'e63218fb-9f0b-4619-ab3a-bd68d21b4d57'"),
@@ -131,7 +118,7 @@ export const toolDefinitions = {
 
     thunder_list_environments: defineTool({
         name: "listEnvironments",
-        description: "Returns all Thunder Client environments in the project, including which one is currently active. Environment variable values are never returned — only names and IDs are listed. Use this to verify an active environment exists before running requests that use {{varName}} placeholders.",
+        description: "Returns all Thunder Client environments in the project, including which one is currently active. Environment variable values are never returned — only names and IDs are listed. Use this to verify an active environment exists before running requests that use {{varName}} placeholders. If no environment exists, ask the user to create one in Thunder Client UI — never create or write environment files directly.",
         schema: z.object({
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
@@ -181,12 +168,12 @@ export const toolDefinitions = {
 
     thunder_curl: defineTool({
         name: "createRequest",
-        description: "Creates a new API request in Thunder Client from a curl command. The curl input is parsed to extract the URL, method, headers, and body. Optionally saves the request into a collection and folder. If no collection is provided, the request is saved to Activity only. Additional fields such as auth, tests, scripts, and docs can be set at creation time.",
+        description: "Creates a new API request in Thunder Client from a curl command string. Use this for new requests only — to modify an existing request, use updateRequest instead. The curl string is parsed to extract URL, method, headers, and body. Optionally saves into a collection and folder. If no collection is provided, the request is saved to Activity only.",
         schema: z.object({
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
             curlInput: z.string().min(1, "curlInput is required")
-                .describe("A valid curl command string. Must start with 'curl '. Example: \"curl https://api.example.com/users -X POST -H 'Content-Type: application/json' -d '{\\\"name\\\":\\\"John\\\"}'\""),
+                .describe("A valid curl command string. Must start with 'curl '. Include query parameters directly in the URL — e.g. 'curl https://api.example.com/posts?postId=1&limit=5'. Example: \"curl https://api.example.com/users -X POST -H 'Content-Type: application/json' -d '{\\\"name\\\":\\\"John\\\"}'\""),
             name: z.string().min(1, "name is required")
                 .describe("Display name for the request. Example: 'Create User'"),
             collection: z.string().optional()
@@ -211,7 +198,7 @@ export const toolDefinitions = {
 
     thunder_edit_request: defineTool({
         name: "updateRequest",
-        description: "Updates an existing Thunder Client request by its ID. Only the fields provided are modified — omitted fields retain their current values. Provide requestId and name only to rename a request. Note: moving a request to a different collection or folder is not supported — use the Thunder Client UI for that operation.",
+        description: "Updates an existing Thunder Client request by its ID. Only the fields provided are modified — omitted fields retain their current values. To rename only, provide requestId and name. Moving a request to a different collection or folder is not supported — use Thunder Client UI for that.",
         schema: z.object({
             requestId: z.string().min(1, "requestId is required")
                 .describe("The _id of the request to update. Obtain from getCollections. Example: 'e63218fb-9f0b-4619-ab3a-bd68d21b4d57'"),
@@ -232,7 +219,7 @@ export const toolDefinitions = {
             params: z.array(z.object({
                 name: z.string().describe("Parameter name."),
                 value: z.string().describe("Parameter value. Supports environment variables e.g. '{{userId}}'."),
-                isPath: z.boolean().optional().describe("When true, treated as a path parameter (e.g. /users/:id). When false or omitted, treated as a query parameter."),
+                isPath: z.boolean().optional().describe("When true, treated as a path parameter. The URL must use {name} token syntax, e.g. url '/users/{id}' with param name 'id'. When false or omitted, treated as a query parameter."),
                 isDisabled: z.boolean().optional().describe("When true, the parameter is saved but not sent."),
             })).optional()
                 .describe("Query or path parameters. Replaces all existing parameters. Example: [{name:'page',value:'1'},{name:'limit',value:'10'}]"),
@@ -355,8 +342,6 @@ export const toolDefinitions = {
                 .describe("Environment name to use for this run. Omit to use the active environment automatically."),
             stopOnFail: z.boolean().optional()
                 .describe("When true, stops the run after the first failed request. Default: false."),
-            skip: z.array(z.string()).optional()
-                .describe("Names of requests to skip. Example: ['Login','Delete User']"),
             iterations: z.number().int().min(1).optional()
                 .describe("Number of times to repeat the full collection run. Default: 1."),
             delay: z.number().int().min(0).optional()
@@ -381,10 +366,10 @@ export const toolDefinitions = {
 
 } as const;
 
-// Annotations per tool — signals to the MCP client how to handle each tool
-// readOnlyHint: true  → safe to auto-accept, never writes data
-// destructiveHint: true → always prompt user, cannot be undone
-// idempotentHint: true  → safe to retry, same result if called multiple times
+// Tool annotations — signals to the MCP client how to handle each tool
+// readOnlyHint: true   — never writes data
+// destructiveHint: true — action cannot be undone; client should prompt for confirmation
+// idempotentHint: true  — safe to retry; same result if called multiple times
 const toolAnnotations: Record<string, { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; title?: string }> = {
     debugInfo:          { readOnlyHint: true,  destructiveHint: false, idempotentHint: true,  title: "Debug Info" },
     getCollections:     { readOnlyHint: true,  destructiveHint: false, idempotentHint: true,  title: "Get Collections" },

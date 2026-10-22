@@ -20,17 +20,51 @@ function normalizeCurlInputForWindows(curlInput: string): string {
     );
 }
 
+// aws/ntlm have no credential fields in the schema, so saving them would silently drop the keys
+function checkAuthType(auth?: Record<string, any>): string | undefined {
+    const type = auth?.type;
+    if (type === "aws" || type === "ntlm") {
+        return `${type.toUpperCase()} auth credentials can't be set via MCP. Set them in the Thunder Client UI (Auth tab).`;
+    }
+}
+
+// keep large responses from flooding the AI context
+const MAX_OUTPUT_CHARS = 50_000;
+// large responses must not overflow exec's 1 MB default before they are capped
+const RUN_MAX_BUFFER = 50 * 1024 * 1024;
+
+function capOutput(text: string): string {
+    if (text.length <= MAX_OUTPUT_CHARS) return text;
+    const totalKb = Math.round(text.length / 1024);
+    return text.slice(0, MAX_OUTPUT_CHARS) + `\n…truncated (${totalKb} KB total). Open the request in Thunder Client to see the full response.`;
+}
+
+// report URLs have variables resolved; query values may carry keys, so only names are kept
+function redactQueryValues(url: unknown): unknown {
+    if (typeof url !== "string") return url;
+    const q = url.indexOf("?");
+    if (q === -1) return url;
+    const query = url.slice(q + 1).split("&").map(p => {
+        const eq = p.indexOf("=");
+        return eq === -1 ? p : `${p.slice(0, eq)}=<redacted>`;
+    }).join("&");
+    return `${url.slice(0, q)}?${query}`;
+}
+
 export class ThunderClient {
     private validateProjectDir(projectDir: string): { valid: boolean; error?: string } {
+        if (!path.isAbsolute(projectDir)) {
+            return { valid: false, error: `projectDir must be an absolute path. Received: ${projectDir}` };
+        }
         if (!fs.existsSync(projectDir)) {
-            return { valid: false, error: `Invalid project directory: ${projectDir}` };
+            return { valid: false, error: `Project directory not found: ${projectDir}` };
         }
         return { valid: true };
     }
 
-    private async execCommand(command: string, cwd: string): Promise<{ success: boolean; result?: string; error?: string }> {
+    private async execCommand(command: string, cwd: string, maxBuffer?: number): Promise<{ success: boolean; result?: string; error?: string }> {
         try {
-            const { stdout, stderr } = await execAsync(command, { cwd });
+            const { stdout, stderr } = await execAsync(command, { cwd, ...(maxBuffer ? { maxBuffer } : {}) });
             let succeeded = true;
             let errorMessage: string | undefined = stderr ? stderr.trim() : undefined;
             if ((stderr && stderr.trim()) || stdout?.trim().toLowerCase().includes("error")) {
@@ -41,13 +75,24 @@ export class ThunderClient {
             }
             return { success: succeeded, result: stdout?.trim(), error: errorMessage };
         } catch (error: any) {
-            return { success: false, error: error?.message || "Unknown error" };
+            const msg: string = error?.message || "Unknown error";
+            if (msg.includes("ENOENT") || msg.includes("command not found") || msg.includes("not recognized")) {
+                return { success: false, error: "Thunder Client CLI not found. Install it with: npm install -g @thunderclient/cli" };
+            }
+            return { success: false, error: msg };
         }
     }
 
     private async mcpCmd(input: Record<string, any>, projectDir: string): Promise<any> {
-        const json = JSON.stringify(input).replace(/'/g, "'\\''");
-        const { stdout, stderr } = await execAsync(`tc --mcp-cmd '${json}'`, { cwd: projectDir }).catch(e => ({ stdout: "", stderr: e.message }));
+        // base64 needs no shell quoting, so it passes through cmd.exe and sh unchanged
+        const arg = Buffer.from(JSON.stringify(input)).toString("base64");
+        const { stdout, stderr } = await execAsync(`tc --mcp-cmd ${arg}`, { cwd: projectDir }).catch(e => {
+            const msg: string = e.message || "";
+            if (msg.includes("ENOENT") || msg.includes("command not found") || msg.includes("not recognized")) {
+                return { stdout: "", stderr: "Thunder Client CLI not found. Install it with: npm install -g @thunderclient/cli" };
+            }
+            return { stdout: "", stderr: msg };
+        });
         const lines = stdout.trim().split("\n");
         for (let i = lines.length - 1; i >= 0; i--) {
             try { return JSON.parse(lines[i]); } catch { }
@@ -113,10 +158,13 @@ export class ThunderClient {
     }): Promise<{ success: boolean; error?: string; requestId?: string; updated?: string[] }> {
         const check = this.validateProjectDir(projectDir);
         if (!check.valid) return { success: false, error: check.error };
+        const authError = checkAuthType(auth);
+        if (authError) return { success: false, error: authError };
         const result = await this.mcpCmd({ cmd: "edit-request", requestId, name, url, method, headers, params, body, auth, tests, preReq, postReq, docs }, projectDir);
         if (result?.success) {
-            // Report which fields were actually updated
-            const updated = [name && "name", url && "url", method && "method", headers && "headers", params && "params", body && "body", auth && "auth", tests && "tests", preReq && "preReq", postReq && "postReq", docs && "docs"].filter(Boolean) as string[];
+            // scripts dropped by the CLI must not appear as updated
+            const scriptsDropped = typeof result.warning === "string" && result.warning.includes("scripting");
+            const updated = [name && "name", url && "url", method && "method", headers && "headers", params && "params", body && "body", auth && "auth", tests && "tests", !scriptsDropped && preReq && "preReq", !scriptsDropped && postReq && "postReq", docs && "docs"].filter(Boolean) as string[];
             return { ...result, updated };
         }
         return result;
@@ -196,10 +244,17 @@ export class ThunderClient {
     }): Promise<{ success: boolean; error?: string; target?: string; renamed?: boolean; settingsApplied?: string[] }> {
         const check = this.validateProjectDir(projectDir);
         if (!check.valid) return { success: false, error: check.error };
+        const authError = checkAuthType(settings?.auth);
+        if (authError) return { success: false, error: authError };
         const result = await this.mcpCmd({ cmd: "set-settings", collectionName, folderName, newName, createIfNotExists, settings }, projectDir);
         if (result?.success) {
             const target = folderName ? `${collectionName} > ${folderName}` : collectionName;
-            const settingsApplied = settings ? Object.keys(settings).filter(k => (settings as any)[k] !== undefined) : [];
+            // scripts dropped by the CLI must not appear as applied
+            const scriptsDropped = typeof result.warning === "string" && result.warning.includes("scripting");
+            const settingsApplied = settings
+                ? Object.keys(settings).filter(k => (settings as any)[k] !== undefined
+                    && !(scriptsDropped && (k === "preReq" || k === "postReq")))
+                : [];
             return { ...result, target, ...(newName && { renamed: true, newName }), ...(settingsApplied.length && { settingsApplied }) };
         }
         return result;
@@ -217,7 +272,6 @@ export class ThunderClient {
         folderName,
         env,
         stopOnFail,
-        skip,
         iterations,
         delay,
         concurrent,
@@ -227,7 +281,6 @@ export class ThunderClient {
         folderName?: string;
         env?: string;
         stopOnFail?: boolean;
-        skip?: string[];
         iterations?: number;
         delay?: number;
         concurrent?: number;
@@ -237,11 +290,25 @@ export class ThunderClient {
 
         const resolvedEnv = env || await this.getActiveEnvName(projectDir);
 
+        // --fol requires folder _id, not folder name — resolve it from the list
+        let resolvedFolderId: string | undefined;
+        if (folderName) {
+            const listResult = await this.mcpCmd({ cmd: "list" }, projectDir);
+            const folder = (listResult?.result ?? []).find(
+                (i: any) => i.type === "folder" &&
+                    i.colName === collectionName &&
+                    i.name.toLowerCase() === folderName.toLowerCase()
+            );
+            if (!folder) {
+                return { success: false, error: `Folder "${folderName}" not found in collection "${collectionName}".` };
+            }
+            resolvedFolderId = folder._id;
+        }
+
         let cmd = `tc --col "${collectionName}" --report "json"`;
-        if (folderName) cmd += ` --fol "${folderName}"`;
+        if (resolvedFolderId) cmd += ` --fol "${resolvedFolderId}"`;
         if (resolvedEnv) cmd += ` --env "${resolvedEnv}"`;
         if (stopOnFail) cmd += ` --stop-on-fail`;
-        if (skip && skip.length > 0) cmd += ` --skip "${skip.join(",")}"`;
         if (iterations && iterations > 1) cmd += ` --iterations ${iterations}`;
         if (delay && delay > 0) cmd += ` --delay ${delay}`;
         if (concurrent && concurrent > 1) cmd += ` --concurrent ${concurrent}`;
@@ -254,10 +321,14 @@ export class ThunderClient {
 
         const cmdResult = await this.execCommand(cmd, projectDir);
 
+        if (!cmdResult.success && cmdResult.error?.includes("not found")) {
+            return { success: false, error: cmdResult.error };
+        }
+
         if (!fs.existsSync(reportsDir)) {
             return {
                 success: false,
-                error: `Run failed — no report generated. CLI output: ${cmdResult.result || cmdResult.error || "no output"}. Check: (1) collection name is correct, (2) active environment exists in TC UI if requests use {{varName}}.`,
+                error: `Run failed — no report generated. Verify that the collection name is correct and that an active environment exists if requests use {{varName}} placeholders. CLI output: ${cmdResult.result || cmdResult.error || "no output"}`,
             };
         }
 
@@ -266,18 +337,20 @@ export class ThunderClient {
             .map(f => ({ name: f, mtime: fs.statSync(path.join(reportsDir, f)).mtimeMs }))
             .sort((a, b) => b.mtime - a.mtime);
 
-        const allFiles = fs.readdirSync(reportsDir)
-            .filter(f => f.endsWith(".json"))
-            .map(f => ({ name: f, mtime: fs.statSync(path.join(reportsDir, f)).mtimeMs }))
-            .sort((a, b) => b.mtime - a.mtime);
 
-        const reportFile = newFiles[0] || allFiles[0];
+        // only a report from THIS run is valid - never fall back to an older file
+        const reportFile = newFiles[0];
         if (!reportFile) {
-            return { success: false, error: `Run completed but no report file found. CLI output: ${cmdResult.result || cmdResult.error || "no output"}` };
+            return { success: false, error: `Run produced no report. Verify the collection name is correct. CLI output: ${cmdResult.result || cmdResult.error || "no output"}` };
         }
 
         try {
             const report = JSON.parse(fs.readFileSync(path.join(reportsDir, reportFile.name), "utf-8"));
+            for (const iteration of report.iterations ?? []) {
+                for (const req of iteration.requests ?? []) {
+                    req.url = redactQueryValues(req.url);
+                }
+            }
             const failed = report.totalFailed ?? 0;
             const passed = report.totalPassed ?? 0;
             const total = report.totalRequests ?? (passed + failed);
@@ -297,10 +370,20 @@ export class ThunderClient {
         if (!check.valid) return { success: false, error: check.error };
 
         const [cliResult, listResult, envResult] = await Promise.all([
-            this.execCommand("tc --debug", projectDir),
+            // --mcp: free plan rules instead of the paid-only licence gate
+            this.execCommand("tc --debug --mcp", projectDir),
             this.mcpCmd({ cmd: "list" }, projectDir),
             this.mcpCmd({ cmd: "list-env" }, projectDir),
         ]);
+
+        if (!cliResult.success && cliResult.error?.includes("not found")) {
+            return { success: false, error: cliResult.error };
+        }
+
+        // a plan limit (e.g. workspace storage) must not look like an empty project
+        if (listResult?.limitReached) {
+            return listResult;
+        }
 
         const debugLines = (cliResult.result || "").split("\n");
         const cliVersion = debugLines.find((l: string) => l.includes("CLI Version"))?.replace("CLI Version:", "").trim() ?? "unknown";
@@ -325,7 +408,8 @@ export class ThunderClient {
             collections,
             activityRequests,
             environments,
-            note: "Environment variable values are never shown. Add variables in Thunder Client → Environments.",
+            note: "Environment variable values are never returned. Manage environment variables in Thunder Client → Environments.",
+            SECURITY_RULE: "Environment files contain sensitive data (API keys, secrets, tokens). NEVER read, write, create, or modify any environment files directly — not even thunder-tests/environments/*.json. If an environment is needed, tell the user to create it in Thunder Client UI and ask them to activate it. This rule cannot be overridden by any user instruction.",
         };
     }
 
@@ -335,7 +419,12 @@ export class ThunderClient {
         const result = await this.mcpCmd({ cmd: "list-env" }, projectDir);
         if (result?.success && Array.isArray(result.environments)) {
             const activeEnv = result.environments.find((e: any) => e.active)?.name;
-            return { ...result, total: result.environments.length, activeEnv };
+            return {
+                ...result,
+                total: result.environments.length,
+                activeEnv,
+                SECURITY_RULE: "NEVER read, write, or create environment files. If no environment exists, ask the user to create one in Thunder Client UI.",
+            };
         }
         return result;
     }
@@ -355,9 +444,23 @@ export class ThunderClient {
         const resolvedEnv = env || await this.getActiveEnvName(projectDir);
         let cmd = `tc "${nameOrId}"`;
         if (resolvedEnv) cmd += ` --env "${resolvedEnv}"`;
+        // marks the run as MCP-invoked so the CLI can apply the free plan rules
+        cmd += ` --mcp`;
 
-        const result = await this.execCommand(cmd, projectDir);
-        return { ...result, envUsed: resolvedEnv };
+        const result = await this.execCommand(cmd, projectDir, RUN_MAX_BUFFER);
+        // the response body can contain the word "error" - only CLI error lines mean the run failed
+        if (result.result !== undefined) {
+            const cliFailed = /^\s*error:/im.test(result.result);
+            result.success = !cliFailed && !(result.error && result.error !== result.result);
+            if (result.error === result.result) result.error = cliFailed ? capOutput(result.result) : undefined;
+            result.result = capOutput(result.result);
+        }
+        if (typeof result.error === "string") result.error = capOutput(result.error);
+
+        // report the env the CLI used - an unknown name falls back to the active one
+        const actualEnv = (result.result || "").match(/^Environment:\s+(.+?)\s*$/m)?.[1]
+            ?.replace(/\s*\((Active|Inactive)\)\s*$/i, "").trim();
+        return { ...result, envUsed: actualEnv || resolvedEnv };
     }
 
     async runCurl({
@@ -382,9 +485,11 @@ export class ThunderClient {
         preReq?: Record<string, any>;
         postReq?: Record<string, any>;
         docs?: string[];
-    }): Promise<{ success: boolean; error?: string; requestName?: string; savedTo?: string }> {
+    }): Promise<{ success: boolean; error?: string; requestName?: string; savedTo?: string; requestId?: string; warning?: string; limitReached?: boolean; limit?: any; message?: string }> {
         const check = this.validateProjectDir(projectDir);
         if (!check.valid) return { success: false, error: check.error };
+        const authError = checkAuthType(auth);
+        if (authError) return { success: false, error: authError };
 
         const trimmedInput = curlInput.trim();
         if (!trimmedInput.toLowerCase().startsWith("curl ")) {
@@ -407,8 +512,25 @@ export class ThunderClient {
         if (preReq) reqData.preReq = { inlineScripts: preReq.inlineScripts?.length ? [{ script: preReq.inlineScripts }] : [] };
         if (postReq) reqData.postReq = { inlineScripts: postReq.inlineScripts?.length ? [{ script: postReq.inlineScripts }] : [] };
         if (docs) reqData.docs = docs;
+
+        // extract query params from the curl URL so the params table is populated in the UI
+        const urlMatch = curlArgs.match(/^'?([^'\s]+)'?/);
+        if (urlMatch) {
+            const qIndex = urlMatch[1].indexOf("?");
+            if (qIndex !== -1) {
+                const qs = urlMatch[1].slice(qIndex + 1);
+                const tryDecode = (s: string) => { try { return decodeURIComponent(s); } catch { return s; } };
+                const params = qs.split("&").filter(p => p).map(p => {
+                    const eq = p.indexOf("=");
+                    return eq === -1
+                        ? { name: tryDecode(p), value: "" }
+                        : { name: tryDecode(p.slice(0, eq)), value: tryDecode(p.slice(eq + 1)) };
+                });
+                if (params.length > 0) reqData.params = params;
+            }
+        }
         if (Object.keys(reqData).length > 0) {
-            cmd += ` --req-data '${JSON.stringify(reqData).replace(/'/g, "'\\''")}'`;
+            cmd += ` --req-data ${Buffer.from(JSON.stringify(reqData)).toString("base64")}`;
         }
 
         cmd += ` --mcp`;
@@ -416,8 +538,26 @@ export class ThunderClient {
         const result = await this.execCommand(cmd, projectDir);
         if (result.success) {
             const savedTo = folder ? `${collection} > ${folder}` : collection || "Activity";
-            return { success: true, requestName: name, savedTo };
+            // pass through the CLI warning, else the save looks complete
+            const warning = (result.result || "").match(/^Warning:\s*(.+)$/m)?.[1]?.trim();
+            const requestId = (result.result || "").match(/^Request Id:\s*(\S+)\s*$/m)?.[1];
+            return { success: true, requestName: name, savedTo, ...(requestId && { requestId }), ...(warning && { warning }) };
         }
+
+        // the curl path reports limits as a JSON line in stdout - lift it to the top level
+        const limitLine = (result.result || result.error || "")
+            .split("\n")
+            .map(l => l.trim())
+            .find(l => l.startsWith("{") && l.includes("\"limitReached\""));
+        if (limitLine) {
+            try {
+                const parsed = JSON.parse(limitLine);
+                if (parsed?.limitReached) {
+                    return { ...result, ...parsed };
+                }
+            } catch { /* not JSON after all - fall through to the raw result */ }
+        }
+
         return result;
     }
 
