@@ -23,21 +23,21 @@ not supported by the available tools, inform the user and direct them to the Thu
 | Tool | Purpose |
 |---|---|
 | debugInfo | Verify project setup, CLI version, collections, and environments |
-| getCollections | Browse collections, folders, and requests |
-| getDataById | Retrieve full details of any item by ID |
+| listCollections | Browse collections, folders, and requests |
+| getDetails | Retrieve full details of any item by ID |
 | listEnvironments | List environment names and active status |
 | createCollection | Create a new collection, optionally with a folder |
 | createFolder | Add a folder to a collection |
 | createRequest | Import a request from a curl command |
 | updateRequest | Update name, URL, method, headers, body, auth, or tests |
-| updateSettings | Set collection or folder options, baseUrl, or rename |
+| updateCollectionSettings | Set collection or folder options, baseUrl, or rename |
 | runRequest | Execute a single request |
 | runCollection | Run a collection or folder |
 | deleteRequest | Delete a request from a collection or the Activity tab |
 
 ## URL and baseUrl Convention
 
-Set baseUrl on the collection using updateSettings, then use only the path in request URLs.
+Set baseUrl on the collection using updateCollectionSettings, then use only the path in request URLs.
 Thunder Client prepends baseUrl automatically at runtime.
 
 Correct:   url: "/users/{{userId}}"

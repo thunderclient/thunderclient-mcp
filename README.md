@@ -115,14 +115,14 @@ Then replace `npx -y thunderclient-mcp` with `node /path/to/thunderclient-mcp/di
 | Tool | Description |
 |------|-------------|
 | `debugInfo` | Verify project setup, CLI version, collections, and environments |
-| `getCollections` | Browse all collections, folders, and requests |
-| `getDataById` | Get full details of any item by ID |
+| `listCollections` | Browse all collections, folders, and requests |
+| `getDetails` | Get full details of any item by ID |
 | `listEnvironments` | List environment names and active status |
 | `createCollection` | Create a new collection, optionally with a folder |
 | `createFolder` | Add a folder to a collection |
 | `createRequest` | Create a request from a curl command |
 | `updateRequest` | Update name, URL, method, headers, body, auth, tests, or scripts |
-| `updateSettings` | Set baseUrl, shared auth, default headers, or run options |
+| `updateCollectionSettings` | Set baseUrl, shared auth, default headers, or run options |
 | `runRequest` | Execute a single request |
 | `runCollection` | Run a collection or folder and get the full test report |
 | `deleteRequest` | Delete a request permanently |

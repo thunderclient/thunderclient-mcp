@@ -57,8 +57,6 @@ function redactQueryValues(url: unknown): unknown {
     return `${url.slice(0, q)}?${query}`;
 }
 
-type RunCounts = { total: number; passed: number; failed: number; skipped: number };
-
 export class ThunderClient {
     // error result for an unusable projectDir, undefined when it's fine
     private checkProjectDir(projectDir: string): { success: false; error: string } | undefined {
@@ -324,12 +322,13 @@ export class ThunderClient {
         iterations?: number;
         delay?: number;
         concurrent?: number;
-    }): Promise<{ success: boolean; error?: string; report?: any; envUsed?: string; summary?: { iterations: RunCounts; requests: RunCounts; tests: Omit<RunCounts, "skipped"> } }> {
+    }): Promise<{ success: boolean; error?: string; report?: any; envUsed?: string; summary?: any }> {
         const dirError = this.checkProjectDir(projectDir);
         if (dirError) return dirError;
 
-        // the CLI resolves the folder by name and uses the active env unless one is given
-        const cmd = this.mcpCommand({
+        // the CLI resolves the folder by name and uses the active env unless one is given;
+        // it returns the JSON report as its result instead of saving a file
+        const result = await this.mcpCmd({
             cmd: "run-collection",
             colName: collectionName,
             folderName,
@@ -339,68 +338,23 @@ export class ThunderClient {
             iterations: iterations && iterations > 1 ? iterations : undefined,
             delay: delay && delay > 0 ? delay : undefined,
             concurrent: concurrent && concurrent > 1 ? concurrent : undefined,
-        });
-
-        const reportsDir = path.join(projectDir, "thunder-reports");
-        const beforeFiles = fs.existsSync(reportsDir)
-            ? new Set(fs.readdirSync(reportsDir))
-            : new Set<string>();
-
-        const cmdResult = await this.execCommand(cmd, projectDir);
-        const rejection = parseRunRejection(cmdResult.result ?? cmdResult.error);
-        if (rejection) return rejection as { success: boolean; error?: string };
-
-        if (!cmdResult.success && cmdResult.error?.includes("not found")) {
-            return { success: false, error: cmdResult.error };
-        }
-
-        if (!fs.existsSync(reportsDir)) {
-            return {
-                success: false,
-                error: `Run failed — no report generated. Verify that the collection name is correct and that an active environment exists if requests use {{varName}} placeholders. CLI output: ${cmdResult.result || cmdResult.error || "no output"}`,
-            };
-        }
-
-        const newFiles = fs.readdirSync(reportsDir)
-            .filter(f => f.endsWith(".json") && !beforeFiles.has(f))
-            .map(f => ({ name: f, mtime: fs.statSync(path.join(reportsDir, f)).mtimeMs }))
-            .sort((a, b) => b.mtime - a.mtime);
-
-
-        // only a report from THIS run is valid - never fall back to an older file
-        const reportFile = newFiles[0];
-        if (!reportFile) {
-            return { success: false, error: `Run produced no report. Verify the collection name is correct. CLI output: ${cmdResult.result || cmdResult.error || "no output"}` };
-        }
+        }, projectDir);
+        if (!result?.success || !result.report) return result;
 
         try {
-            const report = JSON.parse(fs.readFileSync(path.join(reportsDir, reportFile.name), "utf-8"));
+            const report = result.report;
             for (const iteration of report.iterations ?? []) {
                 for (const req of iteration.requests ?? []) {
                     req.url = redactQueryValues(req.url);
                 }
             }
-            // same rows as the CLI's Summary Report: report totals count iterations, each iteration's totals count requests;
-            // test counts come from each request's passed / total
-            const iterations = { total: report.totalIterations ?? report.iterations?.length ?? 0, passed: report.totalPassed ?? 0, failed: report.totalFailed ?? 0, skipped: 0 };
-            const requests = { total: 0, passed: 0, failed: 0, skipped: 0 };
-            const tests = { total: 0, passed: 0, failed: 0 };
-            for (const it of report.iterations ?? []) {
-                requests.total += it.totalRequests ?? it.requests?.length ?? 0;
-                requests.passed += it.totalPassed ?? 0;
-                requests.failed += it.totalFailed ?? 0;
-                requests.skipped += it.totalSkipped ?? 0;
-                for (const req of it.requests ?? []) {
-                    tests.total += req.total ?? 0;
-                    tests.passed += req.passed ?? 0;
-                }
-            }
-            tests.failed = tests.total - tests.passed;
+            // report totals count iterations; a run passes when no iteration failed
             return {
-                success: iterations.failed === 0,
+                success: (report.totalFailed ?? 0) === 0,
                 report,
                 envUsed: report.environmentName || env,
-                summary: { iterations, requests, tests },
+                // the CLI's summary: iterations, requests and tests counts
+                summary: result.summary,
             };
         } catch (e: any) {
             return { success: false, error: `Failed to read report: ${e.message}` };

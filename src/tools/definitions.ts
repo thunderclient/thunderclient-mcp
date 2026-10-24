@@ -93,7 +93,7 @@ export const toolDefinitions = {
     }),
 
     thunder_list: defineTool({
-        name: "getCollections",
+        name: "listCollections",
         description: "Returns a flat list of all collections, folders, and requests with their _id, name, type, method, and parent info. Use this to discover existing items and obtain IDs before calling other tools. Also returns 'summary', one row per collection as {colId, name, folders, requests}. When the user asks to see or list collections, show 'summary' as a table with the columns #, Collection, Collection ID, Folders, Requests. Set includeActivity to true only when the user explicitly asks to see Activity tab requests.",
         schema: z.object({
             projectDir: z.string().min(1, "projectDir is required")
@@ -105,11 +105,11 @@ export const toolDefinitions = {
     }),
 
     thunder_list_by_id: defineTool({
-        name: "getDataById",
-        description: "Returns full details of a single collection, folder, or request by its _id. For a request: returns url, method, headers, params, body, auth, tests, and scripts. Sensitive auth values are masked. For a collection, also returns 'outline': a nested markdown list of its folders and requests. When showing a collection to the user, print only the collection name, its _id and 'outline' exactly as given. Do not show collection settings, folder settings or request URLs, headers, bodies or tests unless the user asks for them. Use getCollections first to obtain the _id. Do not use this to read environment files — environment variable values are never returned.",
+        name: "getDetails",
+        description: "Returns full details of a single collection, folder, or request by its _id. For a request: returns url, method, headers, params, body, auth, tests, and scripts. Sensitive auth values are masked. For a collection, also returns 'outline': a nested markdown list of its folders and requests. When showing a collection to the user, print only the collection name, its _id and 'outline' exactly as given. Do not show collection settings, folder settings or request URLs, headers, bodies or tests unless the user asks for them. Use listCollections first to obtain the _id. Do not use this to read environment files — environment variable values are never returned.",
         schema: z.object({
             id: z.string().min(1, "id is required")
-                .describe("The _id of the collection, folder, or request to retrieve. Obtain from getCollections. Example: 'e63218fb-9f0b-4619-ab3a-bd68d21b4d57'"),
+                .describe("The _id of the collection, folder, or request to retrieve. Obtain from listCollections. Example: 'e63218fb-9f0b-4619-ab3a-bd68d21b4d57'"),
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
         }),
@@ -128,7 +128,7 @@ export const toolDefinitions = {
 
     thunder_create_collection: defineTool({
         name: "createCollection",
-        description: "Creates a new collection in Thunder Client, and optionally a folder inside it. If the collection already exists, returns success without error. After creation, use updateSettings to configure baseUrl, shared auth, or default headers.",
+        description: "Creates a new collection in Thunder Client, and optionally a folder inside it. If the collection already exists, returns success without error. After creation, use updateCollectionSettings to configure baseUrl, shared auth, or default headers.",
         schema: z.object({
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
@@ -152,7 +152,7 @@ export const toolDefinitions = {
 
     thunder_create_folder: defineTool({
         name: "createFolder",
-        description: "Creates a folder inside an existing Thunder Client collection. Supports one level of nesting — provide parentFolderName to create a subfolder inside an existing top-level folder. Use getCollections to confirm collection and parent folder names before calling.",
+        description: "Creates a folder inside an existing Thunder Client collection. Supports one level of nesting — provide parentFolderName to create a subfolder inside an existing top-level folder. Use listCollections to confirm collection and parent folder names before calling.",
         schema: z.object({
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
@@ -199,7 +199,7 @@ export const toolDefinitions = {
         description: "Updates an existing Thunder Client request by its ID. Only the fields provided are modified — omitted fields retain their current values. To rename only, provide reqId and name. Moving a request to a different collection or folder is not supported — use Thunder Client UI for that.",
         schema: z.object({
             reqId: z.string().min(1, "reqId is required")
-                .describe("The _id of the request to update. Obtain from getCollections. Example: 'e63218fb-9f0b-4619-ab3a-bd68d21b4d57'"),
+                .describe("The _id of the request to update. Obtain from listCollections. Example: 'e63218fb-9f0b-4619-ab3a-bd68d21b4d57'"),
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
             name: z.string().optional()
@@ -248,7 +248,7 @@ export const toolDefinitions = {
     }),
 
     thunder_set_settings: defineTool({
-        name: "updateSettings",
+        name: "updateCollectionSettings",
         description: "Sets or updates settings on a Thunder Client collection or folder. Settings are inherited by all requests inside — use this to configure shared auth, default headers, base URL, and run options. Only the fields provided are updated; existing settings are preserved. Pass createIfNotExists to auto-create the collection if it does not exist. Pass newName to rename the collection or folder — can be combined with settings changes or used alone.",
         schema: z.object({
             projectDir: z.string().min(1, "projectDir is required")
@@ -317,7 +317,7 @@ export const toolDefinitions = {
         description: "Executes a single Thunder Client request by name or ID and returns the response. Automatically uses the active environment — omit env unless a specific override is needed. Returns the raw CLI output including status code, response body, and test results.",
         schema: z.object({
             nameOrId: z.string().min(1, "nameOrId is required")
-                .describe("Name or _id of the request to execute. Obtain from getCollections."),
+                .describe("Name or _id of the request to execute. Obtain from listCollections."),
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
             env: z.string().optional()
@@ -333,7 +333,7 @@ export const toolDefinitions = {
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
             collectionName: z.string().min(1, "collectionName is required")
-                .describe("Name of the collection to run. Obtain the exact name from getCollections."),
+                .describe("Name of the collection to run. Obtain the exact name from listCollections."),
             folderName: z.string().optional()
                 .describe("Name of a folder within the collection to run. Omit to run all requests in the collection."),
             env: z.string().optional()
@@ -352,10 +352,10 @@ export const toolDefinitions = {
 
     thunder_delete_request: defineTool({
         name: "deleteRequest",
-        description: "Permanently deletes a Thunder Client request by its ID. This action cannot be undone. Returns the deleted request's name, method, and URL on success. Use getCollections to obtain the request ID before calling.",
+        description: "Permanently deletes a Thunder Client request by its ID. This action cannot be undone. Returns the deleted request's name, method, and URL on success. Use listCollections to obtain the request ID before calling.",
         schema: z.object({
             reqId: z.string().min(1, "reqId is required")
-                .describe("The _id of the request to delete. Obtain from getCollections. Example: 'e63218fb-9f0b-4619-ab3a-bd68d21b4d57'"),
+                .describe("The _id of the request to delete. Obtain from listCollections. Example: 'e63218fb-9f0b-4619-ab3a-bd68d21b4d57'"),
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
         }),
@@ -369,18 +369,18 @@ export const toolDefinitions = {
 // destructiveHint: true — action cannot be undone; client should prompt for confirmation
 // idempotentHint: true  — safe to retry; same result if called multiple times
 const toolAnnotations: Record<string, { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; title?: string }> = {
-    debugInfo:          { readOnlyHint: true,  destructiveHint: false, idempotentHint: true,  title: "Debug Info" },
-    getCollections:     { readOnlyHint: true,  destructiveHint: false, idempotentHint: true,  title: "Get Collections" },
-    getDataById:        { readOnlyHint: true,  destructiveHint: false, idempotentHint: true,  title: "Get Data By ID" },
-    listEnvironments:   { readOnlyHint: true,  destructiveHint: false, idempotentHint: true,  title: "List Environments" },
-    createCollection:   { readOnlyHint: false, destructiveHint: false, idempotentHint: false, title: "Create Collection" },
-    createFolder:       { readOnlyHint: false, destructiveHint: false, idempotentHint: false, title: "Create Folder" },
-    createRequest:      { readOnlyHint: false, destructiveHint: false, idempotentHint: false, title: "Create Request" },
-    updateRequest:      { readOnlyHint: false, destructiveHint: false, idempotentHint: true,  title: "Update Request" },
-    updateSettings:     { readOnlyHint: false, destructiveHint: false, idempotentHint: true,  title: "Update Settings" },
-    runRequest:         { readOnlyHint: false, destructiveHint: false, idempotentHint: false, title: "Run Request" },
-    runCollection:      { readOnlyHint: false, destructiveHint: false, idempotentHint: false, title: "Run Collection" },
-    deleteRequest:      { readOnlyHint: false, destructiveHint: true,  idempotentHint: false, title: "Delete Request" },
+    debugInfo:                { readOnlyHint: true,  destructiveHint: false, idempotentHint: true,  title: "Debug Info" },
+    listCollections:          { readOnlyHint: true,  destructiveHint: false, idempotentHint: true,  title: "List Collections" },
+    getDetails:               { readOnlyHint: true,  destructiveHint: false, idempotentHint: true,  title: "Get Details" },
+    listEnvironments:         { readOnlyHint: true,  destructiveHint: false, idempotentHint: true,  title: "List Environments" },
+    createCollection:         { readOnlyHint: false, destructiveHint: false, idempotentHint: false, title: "Create Collection" },
+    createFolder:             { readOnlyHint: false, destructiveHint: false, idempotentHint: false, title: "Create Folder" },
+    createRequest:            { readOnlyHint: false, destructiveHint: false, idempotentHint: false, title: "Create Request" },
+    updateRequest:            { readOnlyHint: false, destructiveHint: false, idempotentHint: true,  title: "Update Request" },
+    updateCollectionSettings: { readOnlyHint: false, destructiveHint: false, idempotentHint: true,  title: "Update Collection Settings" },
+    runRequest:               { readOnlyHint: false, destructiveHint: false, idempotentHint: false, title: "Run Request" },
+    runCollection:            { readOnlyHint: false, destructiveHint: false, idempotentHint: false, title: "Run Collection" },
+    deleteRequest:            { readOnlyHint: false, destructiveHint: true,  idempotentHint: false, title: "Delete Request" },
 };
 
 export const tools: Tool[] = Object.values(toolDefinitions).map(def => ({
