@@ -32,7 +32,7 @@ Run this command in your terminal:
 codex mcp add thunderclient -- npx -y thunderclient-mcp
 ```
 
-### GitHub Copilot
+### GitHub Copilot CLI
 
 Add to `~/.copilot/mcp-config.json`:
 
@@ -47,7 +47,7 @@ Add to `~/.copilot/mcp-config.json`:
 }
 ```
 
-Or use the interactive installer:
+Or run the interactive installer inside the Copilot CLI:
 
 ```bash
 /mcp add
@@ -55,13 +55,12 @@ Or use the interactive installer:
 
 ### Cursor
 
-Add to `.vscode/mcp.json` in your project:
+Add to `.cursor/mcp.json` in your project (or `~/.cursor/mcp.json` for all projects):
 
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "thunderclient": {
-      "type": "stdio",
       "command": "npx",
       "args": ["-y", "thunderclient-mcp"]
     }
@@ -84,9 +83,9 @@ Add to `.codeium/windsurf/mcp_config.json`:
 }
 ```
 
-### VS Code
+### VS Code (GitHub Copilot)
 
-Add to `.vscode/mcp.json` in your project:
+Add to `.vscode/mcp.json` in your project, then enable the Thunder Client tools in Copilot Chat's Agent mode:
 
 ```json
 {
@@ -167,7 +166,7 @@ in my project at /Users/john/my-project.
 
 ## Resources
 
-The MCP server exposes two resources that provide guidelines to the AI:
+The MCP server exposes two resources that provide guidance to the AI:
 
 - **`tc://docs`** — Tool overview, URL conventions, token flow pattern, and scripting API reference
 - **`tc://env-guide`** — How to handle environment variables and secrets safely
@@ -183,10 +182,10 @@ The MCP server exposes two resources that provide guidelines to the AI:
 
 ## Troubleshooting
 
-- **`tc` not found** — make sure `@thunderclient/cli` is installed globally: `npm install -g @thunderclient/cli`
+- **`tc` not found** — make sure `@thunderclient/cli` is installed globally (`npm install -g @thunderclient/cli`) and on your PATH
 - **"No JSON output from CLI"** — your CLI is older than 2.1.0. Update it: `npm install -g @thunderclient/cli@latest`
-- **No collections found** — run `debugInfo` first to verify the project directory and data path
-- **Requests use `{{varName}}` but values not resolving** — set up an active environment in Thunder Client → Environments
+- **No collections found** — run `debugInfo` to verify the project directory and data path
+- **`{{varName}}` values aren't resolving** — set an active environment in Thunder Client → Environments
 
 ---
 
@@ -195,4 +194,5 @@ The MCP server exposes two resources that provide guidelines to the AI:
 Issues and pull requests are welcome at [github.com/thunderclient/thunderclient-mcp](https://github.com/thunderclient/thunderclient-mcp).
 
 ## Audit
+
 [![MseeP.ai Security Assessment Badge](https://mseep.net/pr/thunderclient-thunderclient-mcp-badge.png)](https://mseep.ai/app/thunderclient-thunderclient-mcp)
