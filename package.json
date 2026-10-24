@@ -12,6 +12,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "watch": "tsc --watch",
     "prepublishOnly": "rimraf dist && tsc",
     "postinstall": "npm install -g @thunderclient/cli@latest"
   },

@@ -94,7 +94,7 @@ export const toolDefinitions = {
 
     thunder_list: defineTool({
         name: "getCollections",
-        description: "Returns a flat list of all collections, folders, and requests with their _id, name, type, method, and parent info. Use this to discover existing items and obtain IDs before calling other tools. Set includeActivity to true only when the user explicitly asks to see Activity tab requests.",
+        description: "Returns a flat list of all collections, folders, and requests with their _id, name, type, method, and parent info. Use this to discover existing items and obtain IDs before calling other tools. Also returns 'summary', one row per collection as {colId, name, folders, requests}. When the user asks to see or list collections, show 'summary' as a table with the columns #, Collection, Collection ID, Folders, Requests. Set includeActivity to true only when the user explicitly asks to see Activity tab requests.",
         schema: z.object({
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
@@ -106,7 +106,7 @@ export const toolDefinitions = {
 
     thunder_list_by_id: defineTool({
         name: "getDataById",
-        description: "Returns full details of a single collection, folder, or request by its _id. For a request: returns url, method, headers, params, body, auth, tests, and scripts. Sensitive auth values are masked. Use getCollections first to obtain the _id. Do not use this to read environment files — environment variable values are never returned.",
+        description: "Returns full details of a single collection, folder, or request by its _id. For a request: returns url, method, headers, params, body, auth, tests, and scripts. Sensitive auth values are masked. For a collection, also returns 'outline': a nested markdown list of its folders and requests. When showing a collection to the user, print only the collection name, its _id and 'outline' exactly as given. Do not show collection settings, folder settings or request URLs, headers, bodies or tests unless the user asks for them. Use getCollections first to obtain the _id. Do not use this to read environment files — environment variable values are never returned.",
         schema: z.object({
             id: z.string().min(1, "id is required")
                 .describe("The _id of the collection, folder, or request to retrieve. Obtain from getCollections. Example: 'e63218fb-9f0b-4619-ab3a-bd68d21b4d57'"),
@@ -191,16 +191,14 @@ export const toolDefinitions = {
             docs: z.array(z.string()).optional()
                 .describe(docsDesc),
         }),
-        handler: async (client, args) => {
-            return client.runCurl({ ...args, curlInput: args.curlInput, name: args.name, projectDir: args.projectDir! });
-        },
+        handler: async (client, args) => client.createRequest({ ...args, projectDir: args.projectDir! }),
     }),
 
     thunder_edit_request: defineTool({
         name: "updateRequest",
-        description: "Updates an existing Thunder Client request by its ID. Only the fields provided are modified — omitted fields retain their current values. To rename only, provide requestId and name. Moving a request to a different collection or folder is not supported — use Thunder Client UI for that.",
+        description: "Updates an existing Thunder Client request by its ID. Only the fields provided are modified — omitted fields retain their current values. To rename only, provide reqId and name. Moving a request to a different collection or folder is not supported — use Thunder Client UI for that.",
         schema: z.object({
-            requestId: z.string().min(1, "requestId is required")
+            reqId: z.string().min(1, "reqId is required")
                 .describe("The _id of the request to update. Obtain from getCollections. Example: 'e63218fb-9f0b-4619-ab3a-bd68d21b4d57'"),
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
@@ -330,7 +328,7 @@ export const toolDefinitions = {
 
     thunder_run_collection: defineTool({
         name: "runCollection",
-        description: "Runs all requests in a Thunder Client collection (or a specific folder) and returns the full test report. Automatically uses the active environment. Returns per-request pass/fail results, test assertion details, response times, and a summary with total, passed, and failed counts.",
+        description: "Runs all requests in a Thunder Client collection (or a specific folder) and returns the full test report. Automatically uses the active environment. Returns per-request pass/fail results, test assertion details, response times, and a summary with total / passed / failed / skipped counts for iterations and requests, plus test assertion counts. When showing the result, always end with a section headed '**Summary Report**' containing a markdown table with columns 'Name', 'Total', 'Passed', 'Failed', 'Skipped' and exactly two rows: 'Total Iterations' from summary.iterations and 'Total Requests' from summary.requests.",
         schema: z.object({
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
@@ -356,12 +354,12 @@ export const toolDefinitions = {
         name: "deleteRequest",
         description: "Permanently deletes a Thunder Client request by its ID. This action cannot be undone. Returns the deleted request's name, method, and URL on success. Use getCollections to obtain the request ID before calling.",
         schema: z.object({
-            requestId: z.string().min(1, "requestId is required")
+            reqId: z.string().min(1, "reqId is required")
                 .describe("The _id of the request to delete. Obtain from getCollections. Example: 'e63218fb-9f0b-4619-ab3a-bd68d21b4d57'"),
             projectDir: z.string().min(1, "projectDir is required")
                 .describe(projectDirDesc),
         }),
-        handler: async (client, args) => client.deleteRequest(args.requestId, args.projectDir!),
+        handler: async (client, args) => client.deleteRequest(args.reqId, args.projectDir!),
     }),
 
 } as const;

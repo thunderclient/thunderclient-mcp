@@ -7,11 +7,30 @@ const version = pkg.version;
 
 const execAsync = promisify(exec);
 
+const CLI_NOT_FOUND = "Thunder Client CLI not found. Install it with: npm install -g @thunderclient/cli";
+
+// a missing tc binary is reported differently by sh, zsh and cmd.exe
+function isCliMissing(message: string): boolean {
+    return message.includes("ENOENT") || message.includes("command not found") || message.includes("not recognized");
+}
+
 // aws/ntlm have no credential fields in the schema, so saving them would silently drop the keys
 function checkAuthType(auth?: Record<string, any>): string | undefined {
     const type = auth?.type;
     if (type === "aws" || type === "ntlm") {
         return `${type.toUpperCase()} auth credentials can't be set via MCP. Set them in the Thunder Client UI (Auth tab).`;
+    }
+}
+
+// a run rejected up front (missing args, unknown env, plan limit) ends with a JSON result line instead of run output
+function parseRunRejection(output?: string): Record<string, any> | undefined {
+    const lastLine = (output || "").trim().split("\n").pop()?.trim() || "";
+    if (!lastLine.startsWith("{")) return undefined;
+    try {
+        const json = JSON.parse(lastLine);
+        return json?.success === false && (typeof json.error === "string" || json.limitReached) ? json : undefined;
+    } catch {
+        return undefined;
     }
 }
 
@@ -38,15 +57,18 @@ function redactQueryValues(url: unknown): unknown {
     return `${url.slice(0, q)}?${query}`;
 }
 
+type RunCounts = { total: number; passed: number; failed: number; skipped: number };
+
 export class ThunderClient {
-    private validateProjectDir(projectDir: string): { valid: boolean; error?: string } {
+    // error result for an unusable projectDir, undefined when it's fine
+    private checkProjectDir(projectDir: string): { success: false; error: string } | undefined {
         if (!path.isAbsolute(projectDir)) {
-            return { valid: false, error: `projectDir must be an absolute path. Received: ${projectDir}` };
+            return { success: false, error: `projectDir must be an absolute path. Received: ${projectDir}` };
         }
         if (!fs.existsSync(projectDir)) {
-            return { valid: false, error: `Project directory not found: ${projectDir}` };
+            return { success: false, error: `Project directory not found: ${projectDir}` };
         }
-        return { valid: true };
+        return undefined;
     }
 
     private async execCommand(command: string, cwd: string, maxBuffer?: number): Promise<{ success: boolean; result?: string; error?: string }> {
@@ -63,8 +85,8 @@ export class ThunderClient {
             return { success: succeeded, result: stdout?.trim(), error: errorMessage };
         } catch (error: any) {
             const msg: string = error?.message || "Unknown error";
-            if (msg.includes("ENOENT") || msg.includes("command not found") || msg.includes("not recognized")) {
-                return { success: false, error: "Thunder Client CLI not found. Install it with: npm install -g @thunderclient/cli" };
+            if (isCliMissing(msg)) {
+                return { success: false, error: CLI_NOT_FOUND };
             }
             // a non-zero exit (e.g. "Collection not found") prints the reason on stdout, not in the error message
             const output: string = (error?.stdout || "").toString().trim();
@@ -72,55 +94,93 @@ export class ThunderClient {
         }
     }
 
-    // every CLI call is `tc --mcp <json>`; base64 needs no shell quoting, so it passes through cmd.exe and sh unchanged
+    // CLI calls are `tc --mcp <json>` (except tc --debug); base64 needs no shell quoting, so it passes through cmd.exe and sh unchanged
     private mcpCommand(input: Record<string, any>): string {
         return `tc --mcp ${Buffer.from(JSON.stringify(input)).toString("base64")}`;
     }
 
+    // runs a JSON command and returns the CLI's JSON result - the last JSON line it prints
     private async mcpCmd(input: Record<string, any>, projectDir: string): Promise<any> {
-        const { stdout, stderr } = await execAsync(this.mcpCommand(input), { cwd: projectDir }).catch(e => {
-            const msg: string = e.message || "";
-            if (msg.includes("ENOENT") || msg.includes("command not found") || msg.includes("not recognized")) {
-                return { stdout: "", stderr: "Thunder Client CLI not found. Install it with: npm install -g @thunderclient/cli" };
+        let stdout = "";
+        let stderr = "";
+        try {
+            ({ stdout, stderr } = await execAsync(this.mcpCommand(input), { cwd: projectDir }));
+        } catch (e: any) {
+            const msg: string = e?.message || "";
+            if (isCliMissing(msg)) {
+                return { success: false, error: CLI_NOT_FOUND };
             }
-            return { stdout: "", stderr: msg };
-        });
-        const lines = stdout.trim().split("\n");
-        for (let i = lines.length - 1; i >= 0; i--) {
-            try { return JSON.parse(lines[i]); } catch { }
+            // a non-zero exit can still print the JSON result
+            stdout = (e?.stdout || "").toString();
+            stderr = msg;
         }
-        return { success: false, error: stderr || "No JSON output from CLI" };
+
+        const lines = stdout.trim().split("\n").reverse();
+        for (const line of lines) {
+            if (!line.trim().startsWith("{")) continue;
+            try { return JSON.parse(line); } catch { }
+        }
+        return { success: false, error: stderr.trim() || "No JSON output from CLI" };
     }
 
     // Returns flat list of all collections, folders, requests with ids and names
-    async getList(projectDir: string, includeActivity = false): Promise<{ success: boolean; error?: string; result?: any[]; total?: number; collections?: number; folders?: number; requests?: number; activityRequests?: number }> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
+    async getList(projectDir: string, includeActivity = false): Promise<{ success: boolean; error?: string; result?: any[]; summary?: { colId: string; name: string; folders: number; requests: number }[]; total?: number; collections?: number; folders?: number; requests?: number; activityRequests?: number }> {
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
         const result = await this.mcpCmd({ cmd: "list", includeActivity }, projectDir);
         if (result?.success && Array.isArray(result.result)) {
             const collections = result.result.filter((i: any) => i.type === "collection").length;
             const folders = result.result.filter((i: any) => i.type === "folder").length;
             const requests = result.result.filter((i: any) => i.type === "request").length;
-            return { ...result, total: result.result.length, collections, folders, requests, activityRequests: result.activityRequests ?? 0 };
+            // one row per collection, ready to show as a table
+            const summary = result.result
+                .filter((i: any) => i.type === "collection")
+                .map((c: any) => ({
+                    colId: c._id,
+                    name: c.name,
+                    folders: result.result.filter((i: any) => i.type === "folder" && i.colId === c._id).length,
+                    requests: result.result.filter((i: any) => i.type === "request" && i.colId === c._id).length,
+                }));
+            return { ...result, summary, total: result.result.length, collections, folders, requests, activityRequests: result.activityRequests ?? 0 };
         }
         return result;
     }
 
-    // Returns full details of a single item by id
-    async getListById(id: string, projectDir: string): Promise<{ success: boolean; error?: string; result?: any }> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
-        return this.mcpCmd({ cmd: "list-id", id }, projectDir);
+    // Returns full details of a single item by id; a collection also gets a nested markdown outline
+    async getListById(id: string, projectDir: string): Promise<{ success: boolean; error?: string; result?: any; outline?: string }> {
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
+        const result = await this.mcpCmd({ cmd: "list-id", id }, projectDir);
+        if (result?.success && result.result?.type === "collection") {
+            return { ...result, outline: this.buildOutline(result.result.folders ?? [], result.result.requests ?? []) };
+        }
+        return result;
     }
 
-    async deleteRequest(requestId: string, projectDir: string): Promise<{ success: boolean; error?: string; deleted?: { requestId: string; name: string; method: string; url: string } }> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
-        return this.mcpCmd({ cmd: "delete-request", requestId }, projectDir);
+    // folders, then requests, at each level in sortNum order - e.g. "- **Account/**\n  - `GET` Welcome"
+    private buildOutline(folders: any[], requests: any[], containerId = "", depth = 0): string {
+        const bySort = (a: any, b: any) => (a.sortNum ?? 0) - (b.sortNum ?? 0);
+        const indent = "  ".repeat(depth);
+        const lines: string[] = [];
+        for (const folder of folders.filter(f => (f.containerId ?? "") === containerId).sort(bySort)) {
+            lines.push(`${indent}- **${folder.name}/**`);
+            const children = this.buildOutline(folders, requests, folder._id, depth + 1);
+            if (children) lines.push(children);
+        }
+        for (const req of requests.filter(r => (r.containerId ?? "") === containerId).sort(bySort)) {
+            lines.push(`${indent}- \`${req.method}\` ${req.name}`);
+        }
+        return lines.join("\n");
+    }
+
+    async deleteRequest(reqId: string, projectDir: string): Promise<{ success: boolean; error?: string; deleted?: { reqId: string; reqName: string; method: string; url: string } }> {
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
+        return this.mcpCmd({ cmd: "delete-request", reqId }, projectDir);
     }
 
     async editRequest({
-        requestId,
+        reqId,
         projectDir,
         name,
         url,
@@ -134,7 +194,7 @@ export class ThunderClient {
         postReq,
         docs,
     }: {
-        requestId: string;
+        reqId: string;
         projectDir: string;
         name?: string;
         url?: string;
@@ -147,16 +207,15 @@ export class ThunderClient {
         tests?: Record<string, any>[];
         preReq?: { inlineScripts?: string[] };
         postReq?: { inlineScripts?: string[] };
-    }): Promise<{ success: boolean; error?: string; requestId?: string; updated?: string[] }> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
+    }): Promise<{ success: boolean; error?: string; reqId?: string; updated?: string[] }> {
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
         const authError = checkAuthType(auth);
         if (authError) return { success: false, error: authError };
-        const result = await this.mcpCmd({ cmd: "edit-request", requestId, name, url, method, headers, params, body, auth, tests, preReq, postReq, docs }, projectDir);
+        const result = await this.mcpCmd({ cmd: "edit-request", reqId, reqName: name, url, method, headers, params, body, auth, tests, preReq, postReq, docs }, projectDir);
         if (result?.success) {
-            // scripts dropped by the CLI must not appear as updated
-            const scriptsDropped = typeof result.warning === "string" && result.warning.includes("scripting");
-            const updated = [name && "name", url && "url", method && "method", headers && "headers", params && "params", body && "body", auth && "auth", tests && "tests", !scriptsDropped && preReq && "preReq", !scriptsDropped && postReq && "postReq", docs && "docs"].filter(Boolean) as string[];
+            const fields = { name, url, method, headers, params, body, auth, tests, preReq, postReq, docs };
+            const updated = Object.keys(fields).filter(k => (fields as any)[k] !== undefined);
             return { ...result, updated };
         }
         return result;
@@ -173,8 +232,8 @@ export class ThunderClient {
         folderName: string;
         parentFolderName?: string;
     }): Promise<{ success: boolean; error?: string; folderId?: string; folderName?: string; collectionName?: string; path?: string }> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
         const result = await this.mcpCmd({ cmd: "create-folder", colName: collectionName, folderName, parentFolderName }, projectDir);
         if (result?.success) {
             const folderPath = parentFolderName ? `${collectionName} > ${parentFolderName} > ${folderName}` : `${collectionName} > ${folderName}`;
@@ -189,10 +248,10 @@ export class ThunderClient {
     }: {
         projectDir: string;
         collectionName: string;
-    }): Promise<{ success: boolean; error?: string; collectionId?: string; collectionName?: string }> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
-        const result = await this.mcpCmd({ cmd: "create-col", name: collectionName }, projectDir);
+    }): Promise<{ success: boolean; error?: string; colId?: string; collectionName?: string }> {
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
+        const result = await this.mcpCmd({ cmd: "create-col", colName: collectionName }, projectDir);
         if (result?.success) {
             return { ...result, collectionName };
         }
@@ -234,19 +293,14 @@ export class ThunderClient {
             };
         };
     }): Promise<{ success: boolean; error?: string; target?: string; renamed?: boolean; settingsApplied?: string[] }> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
         const authError = checkAuthType(settings?.auth);
         if (authError) return { success: false, error: authError };
-        const result = await this.mcpCmd({ cmd: "set-settings", collectionName, folderName, newName, createIfNotExists, settings }, projectDir);
+        const result = await this.mcpCmd({ cmd: "set-settings", colName: collectionName, folderName, newName, createIfNotExists, settings }, projectDir);
         if (result?.success) {
             const target = folderName ? `${collectionName} > ${folderName}` : collectionName;
-            // scripts dropped by the CLI must not appear as applied
-            const scriptsDropped = typeof result.warning === "string" && result.warning.includes("scripting");
-            const settingsApplied = settings
-                ? Object.keys(settings).filter(k => (settings as any)[k] !== undefined
-                    && !(scriptsDropped && (k === "preReq" || k === "postReq")))
-                : [];
+            const settingsApplied = settings ? Object.keys(settings).filter(k => (settings as any)[k] !== undefined) : [];
             return { ...result, target, ...(newName && { renamed: true, newName }), ...(settingsApplied.length && { settingsApplied }) };
         }
         return result;
@@ -270,14 +324,14 @@ export class ThunderClient {
         iterations?: number;
         delay?: number;
         concurrent?: number;
-    }): Promise<{ success: boolean; error?: string; report?: any; envUsed?: string; summary?: { total: number; passed: number; failed: number } }> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
+    }): Promise<{ success: boolean; error?: string; report?: any; envUsed?: string; summary?: { iterations: RunCounts; requests: RunCounts; tests: Omit<RunCounts, "skipped"> } }> {
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
 
         // the CLI resolves the folder by name and uses the active env unless one is given
         const cmd = this.mcpCommand({
             cmd: "run-collection",
-            collectionName,
+            colName: collectionName,
             folderName,
             env,
             report: "json",
@@ -293,6 +347,8 @@ export class ThunderClient {
             : new Set<string>();
 
         const cmdResult = await this.execCommand(cmd, projectDir);
+        const rejection = parseRunRejection(cmdResult.result ?? cmdResult.error);
+        if (rejection) return rejection as { success: boolean; error?: string };
 
         if (!cmdResult.success && cmdResult.error?.includes("not found")) {
             return { success: false, error: cmdResult.error };
@@ -324,14 +380,27 @@ export class ThunderClient {
                     req.url = redactQueryValues(req.url);
                 }
             }
-            const failed = report.totalFailed ?? 0;
-            const passed = report.totalPassed ?? 0;
-            const total = report.totalRequests ?? (passed + failed);
+            // same rows as the CLI's Summary Report: report totals count iterations, each iteration's totals count requests;
+            // test counts come from each request's passed / total
+            const iterations = { total: report.totalIterations ?? report.iterations?.length ?? 0, passed: report.totalPassed ?? 0, failed: report.totalFailed ?? 0, skipped: 0 };
+            const requests = { total: 0, passed: 0, failed: 0, skipped: 0 };
+            const tests = { total: 0, passed: 0, failed: 0 };
+            for (const it of report.iterations ?? []) {
+                requests.total += it.totalRequests ?? it.requests?.length ?? 0;
+                requests.passed += it.totalPassed ?? 0;
+                requests.failed += it.totalFailed ?? 0;
+                requests.skipped += it.totalSkipped ?? 0;
+                for (const req of it.requests ?? []) {
+                    tests.total += req.total ?? 0;
+                    tests.passed += req.passed ?? 0;
+                }
+            }
+            tests.failed = tests.total - tests.passed;
             return {
-                success: failed === 0,
+                success: iterations.failed === 0,
                 report,
                 envUsed: report.environmentName || env,
-                summary: { total, passed, failed },
+                summary: { iterations, requests, tests },
             };
         } catch (e: any) {
             return { success: false, error: `Failed to read report: ${e.message}` };
@@ -339,11 +408,12 @@ export class ThunderClient {
     }
 
     async runDebug(projectDir: string): Promise<any> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
 
         const [cliResult, listResult, envResult] = await Promise.all([
-            this.execCommand(this.mcpCommand({ cmd: "debug" }), projectDir),
+            // setup info comes from the regular tc --debug text output, not a JSON command
+            this.execCommand("tc --debug", projectDir),
             this.mcpCmd({ cmd: "list" }, projectDir),
             this.mcpCmd({ cmd: "list-env" }, projectDir),
         ]);
@@ -386,8 +456,8 @@ export class ThunderClient {
     }
 
     async listEnvironments(projectDir: string): Promise<{ success: boolean; error?: string; environments?: { name: string; active: boolean }[]; total?: number; activeEnv?: string }> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
         const result = await this.mcpCmd({ cmd: "list-env" }, projectDir);
         if (result?.success && Array.isArray(result.environments)) {
             const activeEnv = result.environments.find((e: any) => e.active)?.name;
@@ -410,13 +480,16 @@ export class ThunderClient {
         projectDir: string;
         env?: string;
     }): Promise<{ success: boolean; error?: string; result?: string; envUsed?: string }> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
 
         // the CLI uses the active env unless one is given
         const cmd = this.mcpCommand({ cmd: "run-request", nameOrId, env });
 
         const result = await this.execCommand(cmd, projectDir, RUN_MAX_BUFFER);
+        const rejection = parseRunRejection(result.result ?? result.error);
+        if (rejection) return rejection as { success: boolean; error?: string };
+
         // the response body can contain the word "error" - only CLI error lines mean the run failed
         if (result.result !== undefined) {
             const cliFailed = /^\s*error:/im.test(result.result);
@@ -432,7 +505,7 @@ export class ThunderClient {
         return { ...result, envUsed: actualEnv || env };
     }
 
-    async runCurl({
+    async createRequest({
         curlInput,
         name,
         collection,
@@ -451,53 +524,33 @@ export class ThunderClient {
         projectDir: string;
         auth?: Record<string, any>;
         tests?: Record<string, any>[];
-        preReq?: Record<string, any>;
-        postReq?: Record<string, any>;
+        preReq?: { inlineScripts?: string[] };
+        postReq?: { inlineScripts?: string[] };
         docs?: string[];
-    }): Promise<{ success: boolean; error?: string; requestName?: string; savedTo?: string; requestId?: string; limitReached?: boolean; limit?: any; message?: string }> {
-        const check = this.validateProjectDir(projectDir);
-        if (!check.valid) return { success: false, error: check.error };
+    }): Promise<{ success: boolean; error?: string; reqName?: string; savedTo?: string; reqId?: string; limitReached?: boolean; limit?: any; message?: string }> {
+        const dirError = this.checkProjectDir(projectDir);
+        if (dirError) return dirError;
         const authError = checkAuthType(auth);
         if (authError) return { success: false, error: authError };
 
-        const trimmedInput = curlInput.trim();
-        if (!trimmedInput.toLowerCase().startsWith("curl ")) {
+        const curl = curlInput.trim();
+        if (!curl.toLowerCase().startsWith("curl ")) {
             return { success: false, error: "Input must start with 'curl '" };
         }
 
-        const curlArgs = trimmedInput.slice(5).trim();
-
-        const reqData: Record<string, any> = {};
-        if (auth) reqData.auth = auth;
-        if (tests) reqData.tests = tests;
-        if (preReq) reqData.preReq = { inlineScripts: preReq.inlineScripts?.length ? [{ script: preReq.inlineScripts }] : [] };
-        if (postReq) reqData.postReq = { inlineScripts: postReq.inlineScripts?.length ? [{ script: postReq.inlineScripts }] : [] };
-        if (docs) reqData.docs = docs;
-
-        // extract query params from the curl URL so the params table is populated in the UI
-        const urlMatch = curlArgs.match(/^'?([^'\s]+)'?/);
-        if (urlMatch) {
-            const qIndex = urlMatch[1].indexOf("?");
-            if (qIndex !== -1) {
-                const qs = urlMatch[1].slice(qIndex + 1);
-                const tryDecode = (s: string) => { try { return decodeURIComponent(s); } catch { return s; } };
-                const params = qs.split("&").filter(p => p).map(p => {
-                    const eq = p.indexOf("=");
-                    return eq === -1
-                        ? { name: tryDecode(p), value: "" }
-                        : { name: tryDecode(p.slice(0, eq)), value: tryDecode(p.slice(eq + 1)) };
-                });
-                if (params.length > 0) reqData.params = params;
-            }
-        }
-        // the curl text goes to the CLI as data, not through the shell; the CLI replies with JSON
+        // the curl text goes to the CLI as data, not through the shell; the CLI parses it (URL params included)
+        // script lines go as-is (inlineScripts: string[]) - the CLI wraps them, like edit-request and set-settings
         return this.mcpCmd({
             cmd: "create-request",
-            curl: trimmedInput,
-            name,
-            collectionName: collection,
+            curl,
+            reqName: name,
+            colName: collection,
             folderName: folder,
-            ...reqData,
+            auth,
+            tests,
+            preReq,
+            postReq,
+            docs,
         }, projectDir);
     }
 
