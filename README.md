@@ -16,9 +16,9 @@ For requirements, installation, and setup instructions, see the [Thunder Client 
 
 ## Contributing
 
-Issues and pull requests are welcome at [github.com/thunderclient/thunderclient-mcp](https://github.com/thunderclient/thunderclient-mcp).
+Issues and pull requests are welcome.
 
-To build locally:
+To build the server locally, run:
 
 ```bash
 git clone https://github.com/thunderclient/thunderclient-mcp
@@ -27,7 +27,7 @@ npm install
 npm run build
 ```
 
-Then point your MCP config at `node /path/to/thunderclient-mcp/dist/index.js` instead of `npx -y thunderclient-mcp`.
+Then, in your MCP configuration, replace `npx -y thunderclient-mcp` with `node /path/to/thunderclient-mcp/dist/index.js`.
 
 ## Audit
 
