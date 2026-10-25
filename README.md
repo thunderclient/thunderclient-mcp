@@ -14,101 +14,9 @@ Compatible with **Claude Code**, **Codex**, **GitHub Copilot**, **Cursor**, **Wi
 - [Thunder Client VS Code extension](https://marketplace.visualstudio.com/items?itemName=rangav.vscode-thunder-client) must be installed.
 - [Thunder Client CLI](https://docs.thunderclient.com/cli) **version 2.1.0 or later** must be installed and available in PATH: `npm install -g @thunderclient/cli` (check with `tc --version`)
 
-## Installation
+## Documentation
 
-### Claude Code
-
-Run this command in your terminal:
-
-```bash
-claude mcp add thunderclient -- npx -y thunderclient-mcp
-```
-
-### Codex
-
-Run this command in your terminal:
-
-```bash
-codex mcp add thunderclient -- npx -y thunderclient-mcp
-```
-
-### GitHub Copilot CLI
-
-Add to `~/.copilot/mcp-config.json`:
-
-```json
-{
-  "mcpServers": {
-    "thunderclient": {
-      "command": "npx",
-      "args": ["-y", "thunderclient-mcp"]
-    }
-  }
-}
-```
-
-Or run the interactive installer inside the Copilot CLI:
-
-```bash
-/mcp add
-```
-
-### Cursor
-
-Add to `.cursor/mcp.json` in your project (or `~/.cursor/mcp.json` for all projects):
-
-```json
-{
-  "mcpServers": {
-    "thunderclient": {
-      "command": "npx",
-      "args": ["-y", "thunderclient-mcp"]
-    }
-  }
-}
-```
-
-### Windsurf
-
-Add to `.codeium/windsurf/mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "thunderclient": {
-      "command": "npx",
-      "args": ["-y", "thunderclient-mcp"]
-    }
-  }
-}
-```
-
-### VS Code (GitHub Copilot)
-
-Add to `.vscode/mcp.json` in your project, then enable the Thunder Client tools in Copilot Chat's Agent mode:
-
-```json
-{
-  "servers": {
-    "thunderclient": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "thunderclient-mcp"]
-    }
-  }
-}
-```
-
-### Local Development
-
-```bash
-git clone https://github.com/thunderclient/thunderclient-mcp
-cd thunderclient-mcp
-npm install
-npm run build
-```
-
-Then replace `npx -y thunderclient-mcp` with `node /path/to/thunderclient-mcp/dist/index.js` in your config.
+For installation and setup instructions for each AI tool, see the [Thunder Client MCP documentation](https://docs.thunderclient.com/mcp).
 
 ## Available Tools
 
@@ -126,43 +34,6 @@ Then replace `npx -y thunderclient-mcp` with `node /path/to/thunderclient-mcp/di
 | `runRequest` | Execute a single request |
 | `runCollection` | Run a collection or folder and get the full test report |
 | `deleteRequest` | Delete a request permanently |
-
-## Example Prompts
-
-### Set up a full API collection
-
-```
-Set up a Thunder Client collection for https://api.example.com in my project at /Users/john/my-project.
-Create a base URL setting, bearer token auth using {{accessToken}}, and requests for:
-- POST /auth/login (capture the token from the response)
-- GET /users
-- POST /users
-- PUT /users/{id}
-- DELETE /users/{id}
-Add a status 200 test to each request, then run the collection.
-```
-
-### Extract APIs from your codebase
-
-```
-Look at the routes in src/routes/ and create a Thunder Client collection called "My API"
-in my project at /Users/john/my-project. Group requests by resource into folders.
-```
-
-### Run and debug
-
-```
-Run the "Payments API" collection in my project at /Users/john/my-project
-and show me which tests failed.
-```
-
-### Quick request
-
-```
-Create a POST request to https://api.example.com/users with JSON body
-{"name":"John","email":"john@example.com"} and save it to the "Users" collection
-in my project at /Users/john/my-project.
-```
 
 ## Resources
 
@@ -192,6 +63,17 @@ The MCP server exposes two resources that provide guidance to the AI:
 ## Contributing
 
 Issues and pull requests are welcome at [github.com/thunderclient/thunderclient-mcp](https://github.com/thunderclient/thunderclient-mcp).
+
+To build locally:
+
+```bash
+git clone https://github.com/thunderclient/thunderclient-mcp
+cd thunderclient-mcp
+npm install
+npm run build
+```
+
+Then point your MCP config at `node /path/to/thunderclient-mcp/dist/index.js` instead of `npx -y thunderclient-mcp`.
 
 ## Audit
 
