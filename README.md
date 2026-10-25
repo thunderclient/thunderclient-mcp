@@ -8,15 +8,9 @@ The Thunder Client MCP server lets AI assistants create, manage, and run API req
 
 Compatible with **Claude Code**, **Codex**, **GitHub Copilot**, **Cursor**, **Windsurf**, and any MCP-compatible AI tool.
 
-## Requirements
-
-- Available on all plans, including the Free plan (with limits). View plans at [thunderclient.com/pricing](https://www.thunderclient.com/pricing).
-- [Thunder Client VS Code extension](https://marketplace.visualstudio.com/items?itemName=rangav.vscode-thunder-client) must be installed.
-- [Thunder Client CLI](https://docs.thunderclient.com/cli) **version 2.1.0 or later** must be installed and available in PATH: `npm install -g @thunderclient/cli` (check with `tc --version`)
-
 ## Documentation
 
-For installation and setup instructions for each AI tool, see the [Thunder Client MCP documentation](https://docs.thunderclient.com/mcp).
+For requirements, installation, and setup instructions, see the [Thunder Client MCP documentation](https://docs.thunderclient.com/mcp).
 
 ## Available Tools
 
@@ -34,29 +28,6 @@ For installation and setup instructions for each AI tool, see the [Thunder Clien
 | `runRequest` | Execute a single request |
 | `runCollection` | Run a collection or folder and get the full test report |
 | `deleteRequest` | Delete a request permanently |
-
-## Resources
-
-The MCP server exposes two resources that provide guidance to the AI:
-
-- **`tc://docs`** — Tool overview, URL conventions, token flow pattern, and scripting API reference
-- **`tc://env-guide`** — How to handle environment variables and secrets safely
-
-## Notes
-
-- Environment variable **values** are never returned — only names and IDs are listed. Manage values in Thunder Client → Environments.
-- Sensitive auth values (tokens, passwords, secrets) are masked in responses.
-- Responses from requests you run, including the response body, are shared with your AI assistant. Avoid running requests whose responses contain secrets you don't want the assistant to see.
-- AWS and NTLM credentials can't be set via MCP — set them in the Thunder Client UI.
-- SSE, WebSocket, and gRPC requests must be created and run in the Thunder Client UI.
-- `projectDir` must be an absolute path to your project root. The CLI resolves the Thunder Client data location automatically based on your settings.
-
-## Troubleshooting
-
-- **`tc` not found** — make sure `@thunderclient/cli` is installed globally (`npm install -g @thunderclient/cli`) and on your PATH
-- **"No JSON output from CLI"** — your CLI is older than 2.1.0. Update it: `npm install -g @thunderclient/cli@latest`
-- **No collections found** — run `debugInfo` to verify the project directory and data path
-- **`{{varName}}` values aren't resolving** — set an active environment in Thunder Client → Environments
 
 ---
 
