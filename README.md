@@ -12,23 +12,6 @@ Compatible with **Claude Code**, **Codex**, **GitHub Copilot**, **Cursor**, **Wi
 
 For requirements, installation, and setup instructions, see the [Thunder Client MCP documentation](https://docs.thunderclient.com/mcp).
 
-## Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `debugInfo` | Verify project setup, CLI version, collections, and environments |
-| `listCollections` | Browse all collections, folders, and requests |
-| `getDetails` | Get full details of any item by ID |
-| `listEnvironments` | List environment names and active status |
-| `createCollection` | Create a new collection, optionally with a folder |
-| `createFolder` | Add a folder to a collection |
-| `createRequest` | Create a request from a curl command |
-| `updateRequest` | Update name, URL, method, headers, body, auth, tests, or scripts |
-| `updateCollectionSettings` | Set baseUrl, shared auth, default headers, or run options |
-| `runRequest` | Execute a single request |
-| `runCollection` | Run a collection or folder and get the full test report |
-| `deleteRequest` | Delete a request permanently |
-
 ---
 
 ## Contributing
