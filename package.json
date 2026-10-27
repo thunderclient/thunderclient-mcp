@@ -20,7 +20,7 @@
     "thunderclient-mcp": "dist/index.js"
   },
   "author": "Thunder Client Limited",
-  "homepage": "https://www.thunderclient.com",
+  "homepage": "https://docs.thunderclient.com/mcp",
   "license": "MIT",
   "repository": {
     "type": "git",

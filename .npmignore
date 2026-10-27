@@ -4,9 +4,12 @@ thunder-tests
 thunder-reports
 patches
 tsconfig.json
+
+# Local AI tool settings
 .vscode
 .continue
 .cline
+.claude
 
 # Logs
 npm-debug.log*
@@ -18,8 +21,9 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
+.mcp.json
 
 
 
-# Local AI tool settings
-.claude
+
+
