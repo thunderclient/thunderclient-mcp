@@ -313,6 +313,7 @@ export class ThunderClient {
         iterations,
         delay,
         concurrent,
+        report,
     }: {
         projectDir: string;
         collectionName: string;
@@ -322,18 +323,19 @@ export class ThunderClient {
         iterations?: number;
         delay?: number;
         concurrent?: number;
+        report?: string[];
     }): Promise<{ success: boolean; error?: string; report?: any; envUsed?: string; summary?: any }> {
         const dirError = this.checkProjectDir(projectDir);
         if (dirError) return dirError;
 
         // the CLI resolves the folder by name and uses the active env unless one is given;
-        // it returns the JSON report as its result instead of saving a file
+        // it returns the JSON report as its result; report files are saved only for the formats asked for
         const result = await this.mcpCmd({
             cmd: "run-collection",
             colName: collectionName,
             folderName,
             env,
-            report: "json",
+            report: report?.length ? report.join(",") : undefined,
             stopOnFail: stopOnFail || undefined,
             iterations: iterations && iterations > 1 ? iterations : undefined,
             delay: delay && delay > 0 ? delay : undefined,

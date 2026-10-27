@@ -346,6 +346,8 @@ export const toolDefinitions = {
                 .describe("Delay in milliseconds between requests. Default: 0."),
             concurrent: z.number().int().min(1).optional()
                 .describe("Number of requests to run concurrently. Default: 1 (sequential)."),
+            report: z.array(z.enum(["html", "json", "xml", "nunit", "csv"])).optional()
+                .describe("Report file formats to save in the project's thunder-reports folder. Omit to save no report files — the run result is returned either way. Example: ['html']"),
         }),
         handler: async (client, args) => client.runCollection({ ...args, projectDir: args.projectDir! }),
     }),
