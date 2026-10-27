@@ -7,6 +7,7 @@ import {
     ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { toolHandlers, tools } from "./tools/definitions.js";
+import { registerResources } from "./resources.js";
 import pkg from '../package.json' with { type: 'json' };
 
 const version = pkg.version;
@@ -22,9 +23,12 @@ const server = new Server(
     {
         capabilities: {
             tools: {},
+            resources: {},
         },
     }
 );
+
+registerResources(server);
 
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {

@@ -2,9 +2,14 @@
 node_modules/
 thunder-tests
 thunder-reports
+
+# Local AI tool settings
 .vscode
 .continue
 .cline
+.claude
+
+.mcp.json
 
 # Build output
 dist/

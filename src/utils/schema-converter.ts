@@ -1,65 +1,28 @@
 import { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
-export function zodToMCPInputSchema(schema: z.ZodSchema): {
-    type: "object";
-    properties?: Record<string, any>;
-    required?: string[];
-    description?: string;
-} {
+export function zodToMCPInputSchema(schema: z.ZodSchema): Tool["inputSchema"] {
     try {
-        const jsonSchema = zodToJsonSchema(schema as any, {
-            target: "jsonSchema7",
-            $refStrategy: "none",
-            definitions: {},
-        });
+        // Zod v4 has toJSONSchema() built in — use it directly
+        const jsonSchema = (schema as any).toJSONSchema?.() as any;
 
-        let actualSchema = jsonSchema;
-
-        // If it has a $ref, extract the actual schema from definitions
-        if (typeof jsonSchema === "object" && jsonSchema !== null) {
-            if ("$ref" in jsonSchema && jsonSchema.definitions) {
-                const refPath = jsonSchema.$ref as string;
-                const definitionKey = refPath.replace("#/definitions/", "");
-
-                if (jsonSchema.definitions[definitionKey]) {
-                    actualSchema = jsonSchema.definitions[definitionKey];
-                }
-            }
-        }
-
-        // Ensure it's an object schema (MCP requirement)
-        if (
-            typeof actualSchema === "object" &&
-            actualSchema !== null &&
-            (actualSchema as any).type === "object"
-        ) {
-            const objectSchema = actualSchema as any;
+        if (jsonSchema && jsonSchema.type === "object") {
             return {
                 type: "object",
-                properties: objectSchema.properties || {},
-                required: Array.isArray(objectSchema.required)
-                    ? objectSchema.required
-                    : [],
-                ...(objectSchema.description && {
-                    description: objectSchema.description,
-                }),
+                properties: jsonSchema.properties || {},
+                required: Array.isArray(jsonSchema.required) ? jsonSchema.required : [],
+                ...(jsonSchema.description && { description: jsonSchema.description }),
             } as Tool["inputSchema"];
         }
 
-        // Fallback for non-object schemas
-        return {
-            type: "object",
-            properties: {},
-            required: [],
-        } as Tool["inputSchema"];
+        // Fallback if schema is wrapped (e.g. ZodEffects from .refine())
+        // Extract the inner schema's JSON and return it
+        if (jsonSchema) {
+            return jsonSchema as Tool["inputSchema"];
+        }
     } catch (error) {
-        console.warn(`Failed to convert schema for tool, using fallback:`, error);
-        return {
-            type: "object",
-            properties: {},
-            required: [],
-        } as Tool["inputSchema"];
+        console.warn("Failed to convert schema:", error);
     }
+
+    return { type: "object", properties: {}, required: [] } as Tool["inputSchema"];
 }
