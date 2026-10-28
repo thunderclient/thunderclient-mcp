@@ -32,7 +32,3 @@ Then, in your MCP configuration, replace `npx -y thunderclient-mcp` with `node /
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
-
-## Audit
-
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/thunderclient-thunderclient-mcp-badge.png)](https://mseep.ai/app/thunderclient-thunderclient-mcp)
