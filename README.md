@@ -4,7 +4,7 @@
 
 # Thunder Client MCP Server
 
-The Thunder Client MCP server lets AI assistants create, manage, and run API requests and collections directly in Thunder Client — without leaving your editor.
+The Thunder Client MCP server is **open source** and lets your AI assistant create, update, and run Thunder Client requests and collections from plain-language prompts.
 
 Compatible with **Claude Code**, **Codex**, **GitHub Copilot**, **Cursor**, **Windsurf**, and any MCP-compatible AI tool.
 
@@ -31,4 +31,4 @@ Then, in your MCP configuration, replace `npx -y thunderclient-mcp` with `node /
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is open source and licensed under the [MIT License](LICENSE).
