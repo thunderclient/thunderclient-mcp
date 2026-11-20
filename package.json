@@ -1,6 +1,6 @@
 {
   "name": "thunderclient-mcp",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Thunder Client MCP Server",
   "main": "dist/index.js`",
   "types": "dist/index.d.ts",
@@ -27,17 +27,14 @@
     "url": "https://github.com/thunderclient/thunderclient-mcp"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
-    "rimraf": "^6.0.1",
+    "rimraf": "^6.1.4",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
-  },
-  "overrides": {
-    "glob": "11.1.0"
   }
 }
